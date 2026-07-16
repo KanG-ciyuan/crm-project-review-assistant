@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CRM 储备项目运营复盘助手 - UI 概念图</title>
+  <style>
+    :root { --ink:#16242b; --muted:#72818a; --line:#dce5e7; --page:#f4f7f7; --surface:#fff; --teal:#0f5b5f; --teal-dark:#0b4246; --amber:#9b6906; --amber-bg:#fff3d9; --red:#a83b3b; --red-bg:#fde8e7; --blue:#3b6675; }
+    * { box-sizing:border-box; }
+    body { margin:0; min-width:1280px; background:var(--page); color:var(--ink); font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif; }
+    .shell { display:grid; grid-template-columns:250px 1fr; min-height:100vh; }
+    aside { background:var(--teal-dark); color:#e8f0ef; padding:28px 20px; }
+    .brand { display:flex; gap:10px; align-items:center; padding:4px 6px 27px; border-bottom:1px solid rgba(255,255,255,.18); }
+    .mark { width:32px; height:32px; border:1px solid #97d3cc; display:grid; place-items:center; font-weight:700; color:#c5eee8; }
+    .brand strong { display:block; font-size:16px; letter-spacing:.5px; } .brand small { display:block; color:#a9c1c1; margin-top:4px; font-size:11px; }
+    .nav { margin:28px 0 24px; } .nav div { padding:11px 12px; margin:4px 0; color:#bad0d0; font-size:13px; border-left:2px solid transparent; }
+    .nav .active { background:rgba(255,255,255,.12); color:#fff; border-left-color:#8ce0d4; }
+    .side-card { border-top:1px solid rgba(255,255,255,.18); padding:22px 6px 0; }
+    .side-card h3 { font-size:12px; letter-spacing:1px; color:#a9c1c1; margin:0 0 12px; font-weight:500; }
+    .file { background:rgba(255,255,255,.1); padding:12px; font-size:12px; line-height:1.7; } .ok { color:#92e2c8; }
+    label { display:block; font-size:11px; color:#b7cece; margin:16px 0 6px; } input { width:100%; border:1px solid rgba(255,255,255,.25); background:rgba(0,0,0,.1); padding:8px; color:#fff; font-size:12px; }
+    main { padding:26px 34px 34px; }
+    .top { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:25px; }
+    h1 { margin:0; font-size:25px; font-weight:650; letter-spacing:.4px; } .top p { margin:7px 0 0; color:var(--muted); font-size:13px; }
+    .date { color:var(--muted); font-size:13px; padding-top:7px; } .date b { color:var(--ink); }
+    .metrics { display:grid; grid-template-columns:repeat(6,1fr); gap:12px; margin-bottom:18px; }
+    .metric { background:var(--surface); border:1px solid var(--line); padding:15px 16px; min-height:92px; }
+    .metric .name { color:var(--muted); font-size:12px; } .metric .value { font-size:25px; margin:10px 0 3px; font-weight:650; } .metric .sub { color:#728c8e; font-size:11px; } .metric .risk { color:var(--red); }
+    .grid { display:grid; grid-template-columns:1.05fr .95fr; gap:18px; margin-bottom:18px; }
+    .panel { background:var(--surface); border:1px solid var(--line); padding:18px; }
+    .panel-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:17px; } h2 { margin:0; font-size:15px; } .link { font-size:12px; color:var(--teal); }
+    .bar-row { display:grid; grid-template-columns:86px 1fr 86px; gap:10px; align-items:center; margin:13px 0; font-size:12px; } .track { height:8px; background:#edf2f2; } .fill { height:100%; background:#3e7880; } .amount { text-align:right; color:#52656d; }
+    .status { display:flex; gap:16px; align-items:center; height:122px; } .donut { width:104px; height:104px; border-radius:50%; background:conic-gradient(#2e7378 0 43%,#9bbfc0 43% 71%,#d6a84f 71% 86%,#cb6966 86%); position:relative; } .donut::after { content:"30 项目"; position:absolute; inset:22px; background:#fff; border-radius:50%; display:grid; place-items:center; color:#54646c; font-size:11px; } .legend { font-size:12px; line-height:2.1; color:#53636a; } .dot { display:inline-block; width:8px; height:8px; margin-right:7px; } .d1{background:#2e7378}.d2{background:#9bbfc0}.d3{background:#d6a84f}.d4{background:#cb6966}
+    .table-panel { background:var(--surface); border:1px solid var(--line); margin-bottom:18px; overflow:hidden; } .table-title { padding:17px 18px 11px; display:flex; justify-content:space-between; align-items:center; } .filters span { border:1px solid var(--line); padding:6px 9px; font-size:11px; color:#64747b; margin-left:6px; }
+    table { width:100%; border-collapse:collapse; font-size:12px; } th { text-align:left; padding:10px 18px; color:#718087; background:#f7f9f9; font-weight:500; border-top:1px solid var(--line); border-bottom:1px solid var(--line); } td { padding:12px 18px; border-bottom:1px solid #edf1f1; } tr:last-child td { border-bottom:0; } .tag { display:inline-block; padding:4px 7px; font-size:11px; } .amber { color:var(--amber); background:var(--amber-bg); } .red { color:var(--red); background:var(--red-bg); } .muted { color:var(--muted); }
+    .report { background:#fff; border:1px solid var(--line); padding:18px; } .report-box { border-left:3px solid var(--teal); background:#f7faf9; padding:14px 16px; font-size:12px; line-height:1.8; color:#43545b; min-height:132px; } .actions { margin-top:13px; text-align:right; } button { background:var(--teal); border:0; color:#fff; padding:9px 13px; font-size:12px; }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <aside>
+      <div class="brand"><div class="mark">CR</div><div><strong>CRM 项目运营复盘</strong><small>储备项目分析助手</small></div></div>
+      <div class="nav"><div class="active">经营复盘</div><div>数据质量待核实</div><div>风险项目待跟进</div><div>复盘报告草稿</div></div>
+      <section class="side-card"><h3>本次导入</h3><div class="file"><b>2026年7月储备项目.xlsx</b><br><span class="ok">● 已读取 30 条项目记录</span><br>工作表：项目明细（标准导入）</div><h3 style="margin-top:24px">分析阈值</h3><label>跟进停滞天数</label><input value="14 天" readonly><label>长周期储备天数</label><input value="90 天" readonly><label>金额复核上限</label><input value="10,000 万元" readonly></section>
+    </aside>
+    <main>
+      <div class="top"><div><h1>2026 年 7 月项目复盘</h1><p>基于导入表格的本地规则分析 · 所有异常须由业务人员确认</p></div><div class="date">分析日期：<b>2026-07-16</b></div></div>
+      <section class="metrics"><div class="metric"><div class="name">项目总数</div><div class="value">30</div><div class="sub">本期导入项目</div></div><div class="metric"><div class="name">储备金额</div><div class="value">8,462</div><div class="sub">单位：万元</div></div><div class="metric"><div class="name">跟进中</div><div class="value">13</div><div class="sub">占比 43.3%</div></div><div class="metric"><div class="name">已签约</div><div class="value">9</div><div class="sub">占比 30.0%</div></div><div class="metric"><div class="name">已丢单</div><div class="value">8</div><div class="sub">占比 26.7%</div></div><div class="metric"><div class="name">风险项目</div><div class="value risk">10</div><div class="sub">待核实 / 待跟进</div></div></section>
+      <section class="grid"><div class="panel"><div class="panel-head"><h2>部门储备金额分布</h2><span class="link">查看明细</span></div><div class="bar-row"><span>工程事业部</span><div class="track"><div class="fill" style="width:88%"></div></div><span class="amount">3,184 万</span></div><div class="bar-row"><span>新能源事业部</span><div class="track"><div class="fill" style="width:66%"></div></div><span class="amount">2,370 万</span></div><div class="bar-row"><span>产业发展部</span><div class="track"><div class="fill" style="width:48%"></div></div><span class="amount">1,744 万</span></div><div class="bar-row"><span>综合业务部</span><div class="track"><div class="fill" style="width:32%"></div></div><span class="amount">1,164 万</span></div></div><div class="panel"><div class="panel-head"><h2>项目状态结构</h2><span class="link">按负责人查看</span></div><div class="status"><div class="donut"></div><div class="legend"><span class="dot d1"></span>跟进中&nbsp;&nbsp;13 项<br><span class="dot d2"></span>已签约&nbsp;&nbsp;9 项<br><span class="dot d3"></span>待复盘&nbsp;&nbsp;5 项<br><span class="dot d4"></span>已丢单&nbsp;&nbsp;3 项</div></div></div></section>
+      <section class="table-panel"><div class="table-title"><h2>经营风险待跟进</h2><div class="filters"><span>全部风险</span><span>部门</span><span>销售经理</span></div></div><table><thead><tr><th>项目编号</th><th>项目名称</th><th>销售经理</th><th>储备金额</th><th>风险标签</th><th>规则说明</th><th>处理状态</th></tr></thead><tbody><tr><td>P-017</td><td>华东园区改造项目</td><td>张晨</td><td>680 万</td><td><span class="tag amber">跟进停滞</span></td><td class="muted">最近拜访超过 14 天</td><td>待跟进</td></tr><tr><td>P-022</td><td>新能源设备采购项目</td><td>李敏</td><td>920 万</td><td><span class="tag red">签约预期失效</span></td><td class="muted">预计签约日早于今天</td><td>待跟进</td></tr><tr><td>P-023</td><td>区域数字化升级项目</td><td>王磊</td><td>1,260 万</td><td><span class="tag amber">高金额低确定性</span></td><td class="muted">金额较高且成单概率不高于 50%</td><td>待人工确认</td></tr></tbody></table></section>
+      <section class="report"><div class="panel-head"><h2>经营复盘草稿</h2><button>下载 Markdown</button></div><div class="report-box"><b>本期经营概览</b><br>本期共导入 30 个储备项目，储备金额合计 8,462 万元。跟进中项目 13 个，其中 10 项出现数据质量或经营风险提示。<br><br><b>建议下期行动</b><br>优先核实金额异常与预计签约逾期项目；对跟进停滞项目明确下一次客户拜访计划。</div></section>
+    </main>
+  </div>
+</body>
+</html>
