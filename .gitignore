@@ -4,6 +4,7 @@ dist/
 .env
 .env.*
 *.log
+*.tsbuildinfo
 uploads/
 real-data/
 .worktrees/
