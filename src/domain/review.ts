@@ -95,7 +95,7 @@ export function reconcileReviewRecords(
       }]
     };
     return next;
-  }, {});
+  }, { ...previous });
 }
 
 export function updateReviewRecord(

@@ -72,4 +72,11 @@ describe('review records', () => {
     storage.setItem('crm-project-review-assistant:review-records:v1', '{bad-json');
     expect(loadReviewRecords(storage)).toEqual({});
   });
+
+  it('keeps historical records that do not appear in the current import', () => {
+    const prior = reconcileReviewRecords([row], ['P-2026-024'], {}, new Date('2026-07-17T09:00:00Z'));
+    const next = reconcileReviewRecords([], [], prior, new Date('2026-07-18T09:00:00Z'));
+
+    expect(next['P-2026-024']).toEqual(prior['P-2026-024']);
+  });
 });
