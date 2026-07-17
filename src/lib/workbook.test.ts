@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import * as XLSX from 'xlsx';
-import { findHeaderRow, validateHeaders } from './workbook';
+import { findHeaderRow, parseSelectedSheet, validateHeaders } from './workbook';
 
 describe('workbook helpers', () => {
   it('finds the standard header after a title row', () => {
@@ -25,5 +25,7 @@ describe('workbook helpers', () => {
     const matrix = XLSX.utils.sheet_to_json<unknown[]>(workbook.Sheets['项目明细（标准导入）'], { header: 1, defval: null, raw: true });
     expect(findHeaderRow(matrix)).toBe(2);
     expect(matrix.slice(3).filter((row) => row.some((cell) => cell !== null && cell !== '')).length).toBe(30);
+    const parsed = parseSelectedSheet(workbook, '项目明细（标准导入）');
+    expect(parsed.rows.find((row) => row.projectId === 'P-2026-024')?.probability).toBe(60);
   });
 });

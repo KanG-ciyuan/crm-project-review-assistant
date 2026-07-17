@@ -55,7 +55,8 @@ const toAmount = (value: unknown): number | null => {
 const toProbability = (value: unknown): number | null => {
   if (!isPresent(value)) return null;
   const probability = Number(String(value).replace('%', '').trim());
-  return Number.isFinite(probability) ? probability : null;
+  if (!Number.isFinite(probability)) return null;
+  return probability > 0 && probability <= 1 ? probability * 100 : probability;
 };
 
 const toText = (value: unknown): string => isPresent(value) ? String(value).trim() : '';

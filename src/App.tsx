@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Download, FileSpreadsheet, ShieldCheck, Upload } from 'lucide-react';
 import { analyzeProjects, type AnalysisResult, type Thresholds } from './domain/analyze';
+import { groupIssuesByProject, type ProjectIssueGroup } from './domain/issues';
 import { createReviewReport } from './domain/report';
 import { inspectWorkbook, parseSelectedSheet, type WorkbookInspection } from './lib/workbook';
 
@@ -20,6 +21,7 @@ export default function App() {
 
   const parsed = useMemo(() => inspection && sheetName ? parseSelectedSheet(inspection.workbook, sheetName) : null, [inspection, sheetName]);
   const visibleIssues = useMemo(() => analysis?.issues.filter((issue) => category === '全部' || issue.category === category) ?? [], [analysis, category]);
+  const visibleIssueGroups = useMemo(() => groupIssuesByProject(visibleIssues), [visibleIssues]);
 
   async function onFileChange(file: File | null) {
     if (!file) return;
@@ -84,7 +86,7 @@ export default function App() {
           <Metric label="风险项目" value={analysis.overview.riskProjectCount} sub="待跟进" risk />
         </section>
         <section className="summary-grid"><Breakdown title="部门储备金额分布" items={analysis.byDepartment} /><Breakdown title="销售经理储备金额分布" items={analysis.bySalesManager} /></section>
-        <section className="table-card"><div className="table-heading"><div><h2>数据质量与经营风险</h2><p>标签为规则提示，不代表系统已确认原始数据错误。</p></div><select aria-label="风险类型" value={category} onChange={(event) => setCategory(event.target.value)}><option>全部</option><option>数据质量</option><option>经营风险</option></select></div><IssueTable issues={visibleIssues} /></section>
+        <section className="table-card"><div className="table-heading"><div><h2>数据质量与经营风险</h2><p>同一项目的多个标签会合并展示；标签为规则提示，不代表系统已确认原始数据错误。</p></div><select aria-label="风险类型" value={category} onChange={(event) => setCategory(event.target.value)}><option>全部</option><option>数据质量</option><option>经营风险</option></select></div><IssueTable groups={visibleIssueGroups} /></section>
         <section className="report-card"><div className="table-heading"><div><h2>经营复盘草稿</h2><p>本地规则自动生成，可人工编辑后下载。</p></div><button className="secondary" onClick={downloadReport} disabled={!report}><Download size={15} /> 下载 Markdown</button></div><textarea value={report} onChange={(event) => setReport(event.target.value)} aria-label="经营复盘草稿" /></section>
       </>}
     </main>
@@ -102,6 +104,6 @@ function Breakdown({ title, items }: { title: string; items: AnalysisResult['byD
   return <section className="chart-card"><h2>{title}</h2>{items.slice(0, 6).map((item) => <div className="bar-row" key={item.name}><span>{item.name}</span><div className="track"><i style={{ width: `${(item.amountWan / max) * 100}%` }} /></div><b>{formatAmount(item.amountWan)} 万</b></div>)}</section>;
 }
 
-function IssueTable({ issues }: { issues: AnalysisResult['issues'] }) { return <div className="table-scroll"><table><thead><tr><th>项目编号</th><th>项目名称</th><th>负责人</th><th>储备金额</th><th>标签</th><th>规则说明</th><th>处理状态</th></tr></thead><tbody>{issues.map((issue, index) => <tr key={`${issue.projectId}-${issue.label}-${index}`}><td>{issue.projectId}</td><td>{issue.projectName}</td><td>{issue.salesManager}</td><td>{issue.amount === null ? '—' : `${formatAmount(issue.amount)} 万`}</td><td><span className={issue.category === '数据质量' ? 'tag quality' : 'tag danger'}>{issue.label}</span></td><td>{issue.reason}</td><td>{issue.status}</td></tr>)}</tbody></table>{issues.length === 0 && <p className="no-issues">当前筛选条件下没有问题记录。</p>}</div>; }
+function IssueTable({ groups }: { groups: ProjectIssueGroup[] }) { return <div className="table-scroll"><table><thead><tr><th>项目编号</th><th>项目名称</th><th>负责人</th><th>储备金额</th><th>标签</th><th>规则说明</th><th>处理状态</th></tr></thead><tbody>{groups.map((group) => <tr key={group.projectId}><td>{group.projectId}</td><td>{group.projectName}</td><td>{group.salesManager}</td><td>{group.amount === null ? '—' : `${formatAmount(group.amount)} 万`}</td><td><div className="tag-stack">{group.issues.map((issue) => <span className={issue.category === '数据质量' ? 'tag quality' : 'tag danger'} key={issue.label}>{issue.label}</span>)}</div></td><td>{group.issues.map((issue) => issue.reason).join('；')}</td><td>{group.issues.map((issue) => issue.status).join('、')}</td></tr>)}</tbody></table>{groups.length === 0 && <p className="no-issues">当前筛选条件下没有问题记录。</p>}</div>; }
 
 function Preview({ rows }: { rows: Array<Record<string, unknown>> }) { const columns = ['项目编号', '项目名称', '部门', '销售经理', '项目状态']; return <div className="preview"><p>前 5 行预览</p><table><thead><tr>{columns.map((column) => <th key={column}>{column}</th>)}</tr></thead><tbody>{rows.map((row, index) => <tr key={index}>{columns.map((column) => <td key={column}>{String(row[column] ?? '—')}</td>)}</tr>)}</tbody></table></div>; }
