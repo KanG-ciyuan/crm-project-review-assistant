@@ -28,4 +28,22 @@ describe('workbook helpers', () => {
     const parsed = parseSelectedSheet(workbook, '项目明细（标准导入）');
     expect(parsed.rows.find((row) => row.projectId === 'P-2026-024')?.probability).toBe(60);
   });
+
+  it('recognizes CRM history headers and normalizes confirmed business fields', () => {
+    const workbook = XLSX.utils.book_new();
+    const sheet = XLSX.utils.aoa_to_sheet([
+      ['序号', '部门', '销售经理', '创建日期', '最近拜访时间', '拜访间隔周期（天）', '项目名称', '项目编码', '项目类型', '项目状态', '行业', '区域', '成单概率', '储备金额（万元）', '预计合同签订时间', '项目等级'],
+      [1, '营销一部', '销售甲', '2026-06-01', '2026-07-01', 31, '项目甲', 'CRM-001', '软件项目', '跟进中', '交通', '华东', '1%-50%', 800, '2026-07-10', 'A级'],
+      [2, '营销二部', '销售乙', '2026-06-02', '2026-07-02', 2, '无', '无', '在线项目', '呆滞', '水利', '华南', '81%-100%', 120, '2026-08-10', 'B级']
+    ]);
+    workbook.SheetNames.push('10-储备项目报备表（跟进中和呆滞）');
+    workbook.Sheets['10-储备项目报备表（跟进中和呆滞）'] = sheet;
+
+    const parsed = parseSelectedSheet(workbook, '10-储备项目报备表（跟进中和呆滞）');
+
+    expect(parsed.profile).toBe('crm-history');
+    expect(parsed.validation.valid).toBe(true);
+    expect(parsed.rows[0]).toMatchObject({ projectId: 'CRM-001', unit: '万元', visitIntervalDays: 31, probabilityBand: '低概率', sourceKey: 'crm-history:1' });
+    expect(parsed.rows[1]).toMatchObject({ projectId: '', projectName: '', status: '呆滞', probabilityBand: '临近签约' });
+  });
 });

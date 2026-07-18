@@ -13,4 +13,13 @@ describe('groupIssuesByProject', () => {
     expect(groups).toHaveLength(1);
     expect(groups[0].issues.map((issue) => issue.label)).toEqual(['金额需复核', '高金额低确定性']);
   });
+
+  it('keeps missing project codes in separate review groups when source rows differ', () => {
+    const groups = groupIssuesByProject([
+      { ...issues[0], reviewKey: 'crm-history:4', projectId: '未填写项目编号', projectName: '未填写项目名称' },
+      { ...issues[0], reviewKey: 'crm-history:9', projectId: '未填写项目编号', projectName: '未填写项目名称' }
+    ]);
+    expect(groups).toHaveLength(2);
+    expect(groups.map((group) => group.reviewKey)).toEqual(['crm-history:4', 'crm-history:9']);
+  });
 });

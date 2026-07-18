@@ -1,6 +1,8 @@
-export type ProjectStatus = '跟进中' | '已签约' | '已丢单';
+export type ProjectStatus = '跟进中' | '呆滞' | '已签约' | '已丢单';
+export type ProbabilityBand = '低概率' | '中等概率' | '较高概率' | '临近签约' | '未知';
 
 export interface ProjectRow {
+  sourceKey?: string;
   projectId: string;
   projectName: string;
   department: string;
@@ -12,6 +14,10 @@ export interface ProjectRow {
   lastVisitAt: string | null;
   expectedSignAt: string | null;
   probability: number | null;
+  probabilityLabel?: string | null;
+  probabilityBand?: ProbabilityBand;
+  visitIntervalDays?: number | null;
+  inputProfile?: 'standard' | 'crm-history';
   industry?: string | null;
   region?: string | null;
   projectType?: string | null;
@@ -27,6 +33,7 @@ export interface Thresholds {
 export type IssueLabel = '字段缺失' | '金额格式异常' | '金额需复核' | '日期逻辑异常' | '疑似重复报备' | '跟进停滞' | '签约预期失效' | '高金额低确定性' | '长期储备待复盘';
 
 export interface Issue {
+  reviewKey?: string;
   projectId: string;
   projectName: string;
   department: string;
@@ -59,6 +66,8 @@ export interface AnalysisResult {
   overview: Overview;
   byDepartment: BreakdownItem[];
   bySalesManager: BreakdownItem[];
+  manualStagnationProjects: ProjectRow[];
+  observationProjects: ProjectRow[];
 }
 
 const REQUIRED_FIELDS: Array<[keyof ProjectRow, string]> = [
@@ -73,6 +82,9 @@ const REQUIRED_FIELDS: Array<[keyof ProjectRow, string]> = [
   ['lastVisitAt', '最近拜访日期'],
   ['expectedSignAt', '预计签约日期'],
   ['probability', '成单概率']
+];
+const CRM_REQUIRED_FIELDS: Array<[keyof ProjectRow, string]> = [
+  ['projectId', '项目编码'], ['projectName', '项目名称'], ['department', '部门'], ['salesManager', '销售经理'], ['status', '项目状态'], ['amount', '储备金额（万元）'], ['lastVisitAt', '最近拜访时间'], ['visitIntervalDays', '拜访间隔周期（天）'], ['expectedSignAt', '预计合同签订时间'], ['probabilityLabel', '成单概率']
 ];
 
 const toWan = (amount: number | null, unit: ProjectRow['unit']): number | null => {
@@ -97,6 +109,7 @@ const percentile = (numbers: number[], percent: number) => {
 };
 
 const issueFrom = (row: ProjectRow, category: Issue['category'], label: IssueLabel, reason: string): Issue => ({
+  reviewKey: row.sourceKey || row.projectId || `${row.projectName}|${row.department}|${row.salesManager}`,
   projectId: row.projectId || '未填写项目编号',
   projectName: row.projectName || '未填写项目名称',
   department: row.department || '未填写部门',
@@ -112,6 +125,8 @@ const duplicateKey = (row: ProjectRow) => [row.projectName, row.department, row.
 
 export function analyzeProjects(rows: ProjectRow[], thresholds: Thresholds, today: Date): AnalysisResult {
   const issues: Issue[] = [];
+  const manualStagnationProjects: ProjectRow[] = [];
+  const observationProjects: ProjectRow[] = [];
   const duplicateCounts = new Map<string, number>();
   const idCounts = new Map<string, number>();
   const amountsWan = rows.map((row) => toWan(row.amount, row.unit)).filter((amount): amount is number => amount !== null);
@@ -123,7 +138,8 @@ export function analyzeProjects(rows: ProjectRow[], thresholds: Thresholds, toda
   }
 
   for (const row of rows) {
-    const missing = REQUIRED_FIELDS.filter(([key]) => row[key] === null || row[key] === undefined || row[key] === '').map(([, label]) => label);
+    const requiredFields = row.inputProfile === 'crm-history' ? CRM_REQUIRED_FIELDS : REQUIRED_FIELDS;
+    const missing = requiredFields.filter(([key]) => row[key] === null || row[key] === undefined || row[key] === '').map(([, label]) => label);
     const amountWan = toWan(row.amount, row.unit);
     const createdAt = parseDate(row.createdAt);
     const lastVisitAt = parseDate(row.lastVisitAt);
@@ -135,6 +151,13 @@ export function analyzeProjects(rows: ProjectRow[], thresholds: Thresholds, toda
     if (createdAt && ((lastVisitAt && lastVisitAt < createdAt) || (expectedSignAt && expectedSignAt < createdAt))) issues.push(issueFrom(row, '数据质量', '日期逻辑异常', '最近拜访日期或预计签约日期早于创建日期'));
     if ((row.projectId && (idCounts.get(row.projectId) ?? 0) > 1) || duplicateCounts.get(duplicateKey(row))! > 1) issues.push(issueFrom(row, '数据质量', '疑似重复报备', '项目编号重复，或项目名称、部门、负责人、创建日期相同'));
 
+    if (row.inputProfile === 'crm-history') {
+      if (row.status === '呆滞') manualStagnationProjects.push(row);
+      if (row.probabilityBand === '低概率') observationProjects.push(row);
+      if (row.status === '跟进中' && (row.visitIntervalDays ?? -1) > 30) issues.push(issueFrom(row, '经营风险', '跟进停滞', `CRM 导出的拜访间隔为 ${row.visitIntervalDays} 天，超过 30 天`));
+      if ((row.status === '跟进中' || row.status === '呆滞') && expectedSignAt && expectedSignAt < today) issues.push(issueFrom(row, '经营风险', '签约预期失效', '预计合同签订日期已过，请更新项目预期或状态'));
+      continue;
+    }
     if (row.status !== '跟进中') continue;
     if (lastVisitAt && daysSince(lastVisitAt, today) > thresholds.followUpDays) issues.push(issueFrom(row, '经营风险', '跟进停滞', `距离最近拜访已超过 ${thresholds.followUpDays} 天`));
     if (expectedSignAt && expectedSignAt < today) issues.push(issueFrom(row, '经营风险', '签约预期失效', '预计签约日期早于分析当天，项目仍为跟进中'));
@@ -167,6 +190,8 @@ export function analyzeProjects(rows: ProjectRow[], thresholds: Thresholds, toda
       riskProjectCount
     },
     byDepartment: buildBreakdown('department'),
-    bySalesManager: buildBreakdown('salesManager')
+    bySalesManager: buildBreakdown('salesManager'),
+    manualStagnationProjects,
+    observationProjects: observationProjects.sort((a, b) => (toWan(b.amount, b.unit) ?? 0) - (toWan(a.amount, a.unit) ?? 0))
   };
 }

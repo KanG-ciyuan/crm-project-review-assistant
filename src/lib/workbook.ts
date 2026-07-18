@@ -2,6 +2,8 @@ import * as XLSX from 'xlsx';
 import type { ProjectRow, ProjectStatus } from '../domain/analyze';
 
 export const REQUIRED_HEADERS = ['项目编号', '项目名称', '部门', '销售经理', '项目状态', '储备金额', '金额单位', '创建日期', '最近拜访日期', '预计签约日期', '成单概率'] as const;
+const CRM_HEADERS = ['部门', '销售经理', '创建日期', '最近拜访时间', '拜访间隔周期（天）', '项目名称', '项目编码', '项目状态', '成单概率', '储备金额（万元）', '预计合同签订时间'] as const;
+export type InputProfile = 'standard' | 'crm-history';
 
 const OPTIONAL_HEADERS = ['行业', '区域/省份', '项目类型', '项目等级'] as const;
 
@@ -16,6 +18,7 @@ export interface WorkbookInspection {
 }
 
 export interface SheetParseResult {
+  profile: InputProfile | null;
   headerRowIndex: number;
   headers: string[];
   validation: HeaderValidation;
@@ -29,9 +32,10 @@ export function validateHeaders(headers: string[]): HeaderValidation {
   const missing = REQUIRED_HEADERS.filter((header) => !headers.includes(header));
   return { valid: missing.length === 0, missing: [...missing] };
 }
+const profileFor = (headers: string[]): InputProfile | null => REQUIRED_HEADERS.every((value) => headers.includes(value)) ? 'standard' : CRM_HEADERS.every((value) => headers.includes(value)) ? 'crm-history' : null;
 
 export function findHeaderRow(matrix: unknown[][]): number {
-  return matrix.findIndex((row) => validateHeaders(row.map((cell) => String(cell ?? '').trim())).valid);
+  return matrix.findIndex((row) => profileFor(row.map((cell) => String(cell ?? '').trim())) !== null);
 }
 
 const toDateString = (value: unknown): string | null => {
@@ -60,6 +64,9 @@ const toProbability = (value: unknown): number | null => {
 };
 
 const toText = (value: unknown): string => isPresent(value) ? String(value).trim() : '';
+const crmText = (value: unknown) => { const text = toText(value); return text === '无' ? '' : text; };
+const PROBABILITY_BANDS: Record<string, NonNullable<ProjectRow['probabilityBand']>> = { '询价类': '低概率', '1%-50%': '低概率', '51%-70%': '中等概率', '71%-80%': '较高概率', '81%-100%': '临近签约' };
+const band = (value: string): ProjectRow['probabilityBand'] => PROBABILITY_BANDS[value] ?? '未知';
 
 const pick = (source: Record<string, unknown>, header: string) => source[header];
 
@@ -75,13 +82,23 @@ export function parseSelectedSheet(workbook: XLSX.WorkBook, sheetName: string): 
   if (!worksheet) throw new Error('未找到所选工作表');
   const matrix = XLSX.utils.sheet_to_json<unknown[]>(worksheet, { header: 1, defval: null, raw: true });
   const headerRowIndex = findHeaderRow(matrix);
-  if (headerRowIndex < 0) return { headerRowIndex, headers: [], validation: { valid: false, missing: [...REQUIRED_HEADERS] }, preview: [], rows: [] };
+  if (headerRowIndex < 0) return { profile: null, headerRowIndex, headers: [], validation: { valid: false, missing: [...REQUIRED_HEADERS] }, preview: [], rows: [] };
 
   const headers = matrix[headerRowIndex].map((cell) => String(cell ?? '').trim());
-  const validation = validateHeaders(headers);
+  const profile = profileFor(headers);
+  const validation = profile ? { valid: true, missing: [] } : validateHeaders(headers);
   const dataRows = matrix.slice(headerRowIndex + 1).filter((row) => row.some(isPresent));
   const objects = dataRows.map((row) => Object.fromEntries(headers.map((header, index) => [header, row[index]])));
-  const rows: ProjectRow[] = objects.map((source) => ({
+  const rows: ProjectRow[] = objects.map((source, index) => profile === 'crm-history' ? ({
+    sourceKey: `crm-history:${index + 1}`, projectId: crmText(pick(source, '项目编码')), projectName: crmText(pick(source, '项目名称')),
+    department: crmText(pick(source, '部门')), salesManager: crmText(pick(source, '销售经理')), status: crmText(pick(source, '项目状态')) as ProjectStatus,
+    amount: toAmount(pick(source, '储备金额（万元）')), unit: '万元', createdAt: toDateString(pick(source, '创建日期')),
+    lastVisitAt: toDateString(pick(source, '最近拜访时间')), visitIntervalDays: toAmount(pick(source, '拜访间隔周期（天）')),
+    expectedSignAt: toDateString(pick(source, '预计合同签订时间')), probability: null, probabilityLabel: crmText(pick(source, '成单概率')),
+    probabilityBand: band(crmText(pick(source, '成单概率'))), inputProfile: 'crm-history', industry: crmText(pick(source, '行业')) || null,
+    region: crmText(pick(source, '区域')) || null, projectType: crmText(pick(source, '项目类型')) || null, projectLevel: crmText(pick(source, '项目等级')) || null
+  }) : ({
+    sourceKey: `standard:${index + 1}`,
     projectId: toText(pick(source, '项目编号')),
     projectName: toText(pick(source, '项目名称')),
     department: toText(pick(source, '部门')),
@@ -96,10 +113,10 @@ export function parseSelectedSheet(workbook: XLSX.WorkBook, sheetName: string): 
     industry: toText(pick(source, '行业')) || null,
     region: toText(pick(source, '区域/省份')) || null,
     projectType: toText(pick(source, '项目类型')) || null,
-    projectLevel: toText(pick(source, '项目等级')) || null
+    projectLevel: toText(pick(source, '项目等级')) || null, inputProfile: 'standard'
   }));
 
-  return { headerRowIndex, headers, validation, preview: objects.slice(0, 5), rows };
+  return { profile, headerRowIndex, headers, validation, preview: objects.slice(0, 5), rows };
 }
 
 export const optionalHeaders = OPTIONAL_HEADERS;

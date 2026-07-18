@@ -12,7 +12,9 @@ const analysis: AnalysisResult = {
   ],
   overview: { projectCount: 30, totalAmountWan: 8462, inProgressCount: 13, signedCount: 9, lostCount: 8, riskProjectCount: 10 },
   byDepartment: [],
-  bySalesManager: []
+  bySalesManager: [],
+  manualStagnationProjects: [],
+  observationProjects: []
 };
 
 const reviews: ReviewRecordMap = {
@@ -37,5 +39,22 @@ describe('createReviewReport', () => {
     expect(report).toContain('安排本周拜访。');
     expect(report).toContain('本期已忽略 1 个项目');
     expect(report).toContain('金额、日期、项目状态及业务结论须由业务人员确认');
+  });
+
+  it('separates manual stagnation and low-probability observations from the risk summary', () => {
+    const manualStagnation = { projectId: 'CRM-002', projectName: '云港仓储升级项目', department: '华南业务部', salesManager: '韩哲', status: '呆滞' as const, amount: 1200, unit: '万元', createdAt: '2026-03-02', lastVisitAt: '2026-04-01', expectedSignAt: '2026-09-30', probability: null, inputProfile: 'crm-history' as const };
+    const observation = { projectId: 'CRM-005', projectName: '北辰综合管廊项目', department: '华东业务部', salesManager: '周岚', status: '跟进中' as const, amount: 1850, unit: '万元', createdAt: '2026-04-26', lastVisitAt: '2026-07-05', expectedSignAt: '2026-11-10', probability: null, inputProfile: 'crm-history' as const };
+    const crmAnalysis: AnalysisResult = {
+      ...analysis,
+      rows: [manualStagnation, observation],
+      manualStagnationProjects: [manualStagnation],
+      observationProjects: [observation]
+    };
+    const report = createReviewReport(crmAnalysis, {}, new Date('2026-07-16'));
+    expect(report).toContain('## 已手动标记呆滞');
+    expect(report).toContain('## 低概率重点项目');
+    expect(report).toContain('不计入经营风险项目数');
+    expect(report).toContain('手动标记呆滞 1 个');
+    expect(report).not.toContain('已签约 9 个');
   });
 });

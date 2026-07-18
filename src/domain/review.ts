@@ -46,22 +46,22 @@ export function createProjectFingerprint(row: ProjectRow) {
 
 export function reconcileReviewRecords(
   rows: ProjectRow[],
-  flaggedIds: string[],
+  flaggedKeys: string[],
   previous: ReviewRecordMap,
   now: Date
 ): ReviewRecordMap {
-  const rowById = new Map(rows.map((row) => [row.projectId, row]));
+  const rowByKey = new Map(rows.map((row) => [row.sourceKey || row.projectId || `${row.projectName}|${row.department}|${row.salesManager}`, row]));
 
-  return flaggedIds.reduce<ReviewRecordMap>((next, projectId) => {
-    const row = rowById.get(projectId);
+  return flaggedKeys.reduce<ReviewRecordMap>((next, reviewKey) => {
+    const row = rowByKey.get(reviewKey);
     if (!row) return next;
 
     const fingerprint = createProjectFingerprint(row);
-    const prior = previous[projectId];
+    const prior = previous[reviewKey];
 
     if (!prior) {
-      next[projectId] = {
-        projectId,
+      next[reviewKey] = {
+        projectId: row.projectId || '未填写项目编号',
         projectName: row.projectName,
         status: '待复核',
         note: '',
@@ -75,11 +75,11 @@ export function reconcileReviewRecords(
     }
 
     if (prior.fingerprint === fingerprint) {
-      next[projectId] = { ...prior, projectName: row.projectName };
+      next[reviewKey] = { ...prior, projectName: row.projectName };
       return next;
     }
 
-    next[projectId] = {
+    next[reviewKey] = {
       ...prior,
       projectName: row.projectName,
       status: '待复核',

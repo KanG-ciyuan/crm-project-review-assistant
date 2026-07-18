@@ -32,4 +32,19 @@ describe('analyzeProjects', () => {
     ]));
     expect(rows.find((row) => row.projectId === 'P-2026-024')?.amount).toBe(50000);
   });
+
+  it('uses CRM visit intervals for active projects while keeping manual stagnation separate', () => {
+    const crmRows: ProjectRow[] = [
+      { projectId: 'CRM-A', projectName: '项目A', department: '营销一部', salesManager: '销售甲', status: '跟进中', amount: 800, unit: '万元', createdAt: '2026-06-01', lastVisitAt: '2026-07-01', visitIntervalDays: 31, expectedSignAt: '2026-08-01', probability: null, probabilityBand: '中等概率', inputProfile: 'crm-history' },
+      { projectId: 'CRM-B', projectName: '项目B', department: '营销一部', salesManager: '销售乙', status: '呆滞', amount: 400, unit: '万元', createdAt: '2026-06-01', lastVisitAt: '2026-06-01', visitIntervalDays: 90, expectedSignAt: '2026-08-01', probability: null, probabilityBand: '低概率', inputProfile: 'crm-history' },
+      { projectId: 'CRM-C', projectName: '项目C', department: '营销二部', salesManager: '销售丙', status: '呆滞', amount: 900, unit: '万元', createdAt: '2026-06-01', lastVisitAt: '2026-07-16', visitIntervalDays: 1, expectedSignAt: '2026-07-01', probability: null, probabilityBand: '低概率', inputProfile: 'crm-history' }
+    ];
+    const result = analyzeProjects(crmRows, { followUpDays: 30, longReserveDays: 90, absoluteAmountLimitWan: 10000 }, new Date('2026-07-17'));
+
+    expect(result.issues.map((issue) => [issue.projectId, issue.label])).toContainEqual(['CRM-A', '跟进停滞']);
+    expect(result.issues.map((issue) => [issue.projectId, issue.label])).not.toContainEqual(['CRM-B', '跟进停滞']);
+    expect(result.issues.map((issue) => [issue.projectId, issue.label])).toContainEqual(['CRM-C', '签约预期失效']);
+    expect(result.manualStagnationProjects.map((row) => row.projectId)).toEqual(['CRM-B', 'CRM-C']);
+    expect(result.observationProjects.map((row) => row.projectId)).toEqual(['CRM-C', 'CRM-B']);
+  });
 });

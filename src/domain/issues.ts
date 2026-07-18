@@ -1,6 +1,7 @@
 import type { Issue } from './analyze';
 
 export interface ProjectIssueGroup {
+  reviewKey: string;
   projectId: string;
   projectName: string;
   salesManager: string;
@@ -11,7 +12,9 @@ export interface ProjectIssueGroup {
 export function groupIssuesByProject(issues: Issue[]): ProjectIssueGroup[] {
   const groups = new Map<string, ProjectIssueGroup>();
   for (const issue of issues) {
-    const group = groups.get(issue.projectId) ?? {
+    const reviewKey = issue.reviewKey || issue.projectId;
+    const group = groups.get(reviewKey) ?? {
+      reviewKey,
       projectId: issue.projectId,
       projectName: issue.projectName,
       salesManager: issue.salesManager,
@@ -19,7 +22,7 @@ export function groupIssuesByProject(issues: Issue[]): ProjectIssueGroup[] {
       issues: []
     };
     group.issues.push(issue);
-    groups.set(issue.projectId, group);
+    groups.set(reviewKey, group);
   }
   return [...groups.values()];
 }

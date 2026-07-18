@@ -7,4 +7,6 @@ dist/
 *.tsbuildinfo
 uploads/
 real-data/
+sample-data/*.png
+sample-data/*.inspect.ndjson
 .worktrees/
