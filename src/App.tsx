@@ -96,7 +96,7 @@ export default function App() {
     </aside>
     <main className="content">
       <header><div><h1>储备项目运营复盘助手</h1><p>以固定规则发现数据质量问题和经营风险，最终结论由业务人员确认。</p></div>{parsed?.validation.valid && <button className="primary" onClick={startAnalysis}>开始分析</button>}</header>
-      {!inspection && <section className="empty"><FileSpreadsheet size={36} /><h2>上传标准项目明细表</h2><p>支持未加密的 .xlsx 文件。第一版仅识别标准字段，不自动猜测字段含义。</p></section>}
+      {!inspection && <section className="empty import-guide"><FileSpreadsheet size={36} /><h2>上传 CRM 储备项目表</h2><p>支持未加密的 .xlsx 文件。请使用同一工作表中的固定字段，系统不会自动猜测字段含义。</p><a className="sample-download" href="/CRM历史项目表-脱敏适配样表.xlsx" download><Download size={15} /> 下载脱敏示例表</a><div className="field-guide"><div><h3>必须完整存在的表头</h3><div className="field-tags">{CRM_HISTORY_HEADERS.map((header) => <span key={header}>{header}</span>)}</div></div><div className="field-notes"><p><b>项目状态：</b>跟进中、呆滞</p><p><b>成单概率：</b>询价类、1%-50%、51%-70%、71%-80%、81%-100%</p><p><b>金额单位：</b>储备金额直接填写万元；项目编码或名称为“无”会提示复核。</p></div></div></section>}
       {parsed && !parsed.validation.valid && <section className="notice"><h2>无法开始分析</h2><p>缺少必填字段：{parsed.validation.missing.join('、')}</p><p>请选择包含标准项目明细表的工作表，或修正 Excel 表头后重新上传。</p></section>}
       {parsed?.validation.valid && !analysis && <section className="ready"><h2>文件校验通过</h2><p>已找到 {parsed.rows.length} 条项目记录。确认阈值后点击“开始分析”。</p><Preview rows={parsed.preview} /></section>}
       {analysis && <>
@@ -135,3 +135,5 @@ function ProjectList({ title, description, rows, empty }: { title: string; descr
 }
 
 function Preview({ rows }: { rows: Array<Record<string, unknown>> }) { const columns = ['项目编号', '项目名称', '部门', '销售经理', '项目状态']; return <div className="preview"><p>前 5 行预览</p><table><thead><tr>{columns.map((column) => <th key={column}>{column}</th>)}</tr></thead><tbody>{rows.map((row, index) => <tr key={index}>{columns.map((column) => <td key={column}>{String(row[column] ?? '—')}</td>)}</tr>)}</tbody></table></div>; }
+
+const CRM_HISTORY_HEADERS = ['部门', '销售经理', '创建日期', '最近拜访时间', '拜访间隔周期（天）', '项目名称', '项目编码', '项目状态', '成单概率', '储备金额（万元）', '预计合同签订时间'];
