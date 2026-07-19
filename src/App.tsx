@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Download, FileSpreadsheet, GitFork, Mail, ShieldCheck, Upload } from 'lucide-react';
+import { Copy, Download, FileSpreadsheet, GitFork, Mail, ShieldCheck, Upload } from 'lucide-react';
 import './review.css';
 import { analyzeProjects, type AnalysisResult, type Thresholds } from './domain/analyze';
 import { groupIssuesByProject, type ProjectIssueGroup } from './domain/issues';
@@ -22,6 +22,7 @@ export default function App() {
   const [category, setCategory] = useState('全部');
   const [reviewRecords, setReviewRecords] = useState<ReviewRecordMap>(() => loadReviewRecords(window.localStorage));
   const [reviewStatusFilter, setReviewStatusFilter] = useState<'全部' | ReviewStatus>('全部');
+  const [feedbackCopied, setFeedbackCopied] = useState(false);
 
   const parsed = useMemo(() => inspection && sheetName ? parseSelectedSheet(inspection.workbook, sheetName) : null, [inspection, sheetName]);
   const isCrmHistory = parsed?.profile === 'crm-history';
@@ -81,6 +82,15 @@ export default function App() {
     URL.revokeObjectURL(link.href);
   }
 
+  async function copyFeedbackEmail() {
+    try {
+      await navigator.clipboard.writeText('88416563@qq.com');
+      setFeedbackCopied(true);
+    } catch {
+      setFeedbackCopied(false);
+    }
+  }
+
   return <div className="app-shell">
     <aside className="sidebar">
       <div className="brand"><div className="brand-mark">CR</div><div><strong>CRM 项目运营复盘</strong><span>储备项目分析助手</span></div></div>
@@ -114,6 +124,8 @@ export default function App() {
       <footer className="product-footer">
         <span>反馈建议</span>
         <a href="mailto:88416563@qq.com"><Mail size={14} /> 邮件反馈</a>
+        <i aria-hidden="true" />
+        <button className="footer-action" type="button" onClick={copyFeedbackEmail}><Copy size={14} /> {feedbackCopied ? '已复制' : '复制邮箱'}</button>
         <i aria-hidden="true" />
         <a href="https://github.com/KanG-ciyuan/crm-project-review-assistant" target="_blank" rel="noreferrer"><GitFork size={14} /> 代码与版本</a>
       </footer>

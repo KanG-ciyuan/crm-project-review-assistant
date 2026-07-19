@@ -1,8 +1,11 @@
-import { render, screen } from '@testing-library/react';
-import { expect, it } from 'vitest';
+import { cleanup, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { afterEach, expect, it, vi } from 'vitest';
 import App from './App';
 import type { ProjectRow } from './domain/analyze';
 import { loadReviewRecords, reconcileReviewRecords, saveReviewRecords, updateReviewRecord } from './domain/review';
+
+afterEach(cleanup);
 
 it('retains a user-selected review status after a page-style storage reload', () => {
   const values = new Map<string, string>();
@@ -36,4 +39,16 @@ it('shows email and GitHub feedback links on the import page', () => {
 
   expect(screen.getByRole('link', { name: '邮件反馈' })).toHaveAttribute('href', 'mailto:88416563@qq.com');
   expect(screen.getByRole('link', { name: '代码与版本' })).toHaveAttribute('href', 'https://github.com/KanG-ciyuan/crm-project-review-assistant');
+});
+
+it('copies the feedback email address from the footer', async () => {
+  const user = userEvent.setup();
+  const writeText = vi.fn().mockResolvedValue(undefined);
+  Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+
+  render(<App />);
+  await user.click(screen.getByRole('button', { name: '复制邮箱' }));
+
+  expect(writeText).toHaveBeenCalledWith('88416563@qq.com');
+  expect(await screen.findByRole('button', { name: '已复制' })).toBeInTheDocument();
 });
