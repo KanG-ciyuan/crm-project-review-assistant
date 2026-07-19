@@ -1,4 +1,6 @@
+import { render, screen } from '@testing-library/react';
 import { expect, it } from 'vitest';
+import App from './App';
 import type { ProjectRow } from './domain/analyze';
 import { loadReviewRecords, reconcileReviewRecords, saveReviewRecords, updateReviewRecord } from './domain/review';
 
@@ -27,4 +29,11 @@ it('retains a user-selected review status after a page-style storage reload', ()
   saveReviewRecords(reviewed, storage);
 
   expect(loadReviewRecords(storage)['P-1']).toMatchObject({ status: '已忽略', note: '已处理。' });
+});
+
+it('shows email and GitHub feedback links on the import page', () => {
+  render(<App />);
+
+  expect(screen.getByRole('link', { name: '邮件反馈' })).toHaveAttribute('href', 'mailto:88416563@qq.com');
+  expect(screen.getByRole('link', { name: '代码与版本' })).toHaveAttribute('href', 'https://github.com/KanG-ciyuan/crm-project-review-assistant');
 });

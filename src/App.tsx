@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Download, FileSpreadsheet, ShieldCheck, Upload } from 'lucide-react';
+import { Download, FileSpreadsheet, GitFork, Mail, ShieldCheck, Upload } from 'lucide-react';
 import './review.css';
 import { analyzeProjects, type AnalysisResult, type Thresholds } from './domain/analyze';
 import { groupIssuesByProject, type ProjectIssueGroup } from './domain/issues';
@@ -111,6 +111,12 @@ export default function App() {
         {isCrmHistory && <section className="project-list-grid"><ProjectList title="已手动标记呆滞" description="由销售在 CRM 中主动标记，保留为运营复盘清单，不自动判定为风险。" rows={analysis.manualStagnationProjects} empty="本次没有手动标记为呆滞的项目。" /><ProjectList title="低概率重点项目" description="按储备金额从高到低排列，供管理者优先核验投入与预期；不计入风险项目。" rows={analysis.observationProjects} empty="本次没有低概率项目。" /></section>}
         <section className="report-card"><div className="table-heading"><div><h2>经营复盘草稿</h2><p>本地规则自动生成，可人工编辑后下载。</p></div><button className="secondary" onClick={downloadReport} disabled={!report}><Download size={15} /> 下载 Markdown</button></div><textarea value={report} onChange={(event) => setReport(event.target.value)} aria-label="经营复盘草稿" /></section>
       </>}
+      <footer className="product-footer">
+        <span>反馈建议</span>
+        <a href="mailto:88416563@qq.com"><Mail size={14} /> 邮件反馈</a>
+        <i aria-hidden="true" />
+        <a href="https://github.com/KanG-ciyuan/crm-project-review-assistant" target="_blank" rel="noreferrer"><GitFork size={14} /> 代码与版本</a>
+      </footer>
     </main>
   </div>;
 }
