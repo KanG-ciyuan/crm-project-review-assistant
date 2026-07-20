@@ -11,9 +11,9 @@ import {
 
 const row: ProjectRow = {
   projectId: 'P-2026-024',
-  projectName: '西南综合管廊项目',
+  projectName: '远景综合管廊项目',
   department: '营销三部',
-  salesManager: '王宁',
+  salesManager: '示例经理丙',
   status: '跟进中',
   amount: 50000,
   unit: '万元',

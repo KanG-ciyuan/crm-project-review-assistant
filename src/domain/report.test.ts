@@ -6,9 +6,9 @@ import type { ReviewRecordMap } from './review';
 const analysis: AnalysisResult = {
   rows: [],
   issues: [
-    { projectId: 'P-2026-024', projectName: '西南综合管廊项目', department: '营销三部', salesManager: '王宁', amount: 50000, category: '数据质量', label: '金额需复核', reason: '超过本次复核上限', status: '待人工确认' },
-    { projectId: 'P-2026-025', projectName: '赣州河道治理项目', department: '营销一部', salesManager: '陈晨', amount: 290, category: '经营风险', label: '跟进停滞', reason: '距离最近拜访已超过 14 天', status: '待跟进' },
-    { projectId: 'P-2026-026', projectName: '南昌轨道维保项目', department: '营销一部', salesManager: '陈晨', amount: 480, category: '数据质量', label: '疑似重复报备', reason: '项目编号重复', status: '待人工确认' }
+    { projectId: 'P-2026-024', projectName: '远景综合管廊项目', department: '营销三部', salesManager: '示例经理丙', amount: 50000, category: '数据质量', label: '金额需复核', reason: '超过本次复核上限', status: '待人工确认' },
+    { projectId: 'P-2026-025', projectName: '云川河道治理项目', department: '营销一部', salesManager: '示例经理甲', amount: 290, category: '经营风险', label: '跟进停滞', reason: '距离最近拜访已超过 14 天', status: '待跟进' },
+    { projectId: 'P-2026-026', projectName: '星港轨道维保项目', department: '营销一部', salesManager: '示例经理甲', amount: 480, category: '数据质量', label: '疑似重复报备', reason: '项目编号重复', status: '待人工确认' }
   ],
   overview: { projectCount: 30, totalAmountWan: 8462, inProgressCount: 13, signedCount: 9, lostCount: 8, riskProjectCount: 10 },
   byDepartment: [],
@@ -18,9 +18,9 @@ const analysis: AnalysisResult = {
 };
 
 const reviews: ReviewRecordMap = {
-  'P-2026-024': { projectId: 'P-2026-024', projectName: '西南综合管廊项目', status: '确认数据错误', note: '已通知销售修正金额。', firstReviewedAt: '2026-07-17T09:00:00.000Z', lastReviewedAt: '2026-07-17T09:00:00.000Z', fingerprint: 'x', dataUpdated: false, history: [] },
-  'P-2026-025': { projectId: 'P-2026-025', projectName: '赣州河道治理项目', status: '确认业务风险', note: '安排本周拜访。', firstReviewedAt: '2026-07-17T09:00:00.000Z', lastReviewedAt: '2026-07-17T09:00:00.000Z', fingerprint: 'y', dataUpdated: false, history: [] },
-  'P-2026-026': { projectId: 'P-2026-026', projectName: '南昌轨道维保项目', status: '已忽略', note: '已在专项流程处理。', firstReviewedAt: '2026-07-17T09:00:00.000Z', lastReviewedAt: '2026-07-17T09:00:00.000Z', fingerprint: 'z', dataUpdated: false, history: [] }
+  'P-2026-024': { projectId: 'P-2026-024', projectName: '远景综合管廊项目', status: '确认数据错误', note: '已通知销售修正金额。', firstReviewedAt: '2026-07-17T09:00:00.000Z', lastReviewedAt: '2026-07-17T09:00:00.000Z', fingerprint: 'x', dataUpdated: false, history: [] },
+  'P-2026-025': { projectId: 'P-2026-025', projectName: '云川河道治理项目', status: '确认业务风险', note: '安排本周拜访。', firstReviewedAt: '2026-07-17T09:00:00.000Z', lastReviewedAt: '2026-07-17T09:00:00.000Z', fingerprint: 'y', dataUpdated: false, history: [] },
+  'P-2026-026': { projectId: 'P-2026-026', projectName: '星港轨道维保项目', status: '已忽略', note: '已在专项流程处理。', firstReviewedAt: '2026-07-17T09:00:00.000Z', lastReviewedAt: '2026-07-17T09:00:00.000Z', fingerprint: 'z', dataUpdated: false, history: [] }
 };
 
 describe('createReviewReport', () => {
@@ -42,8 +42,8 @@ describe('createReviewReport', () => {
   });
 
   it('separates manual stagnation and low-probability observations from the risk summary', () => {
-    const manualStagnation = { projectId: 'CRM-002', projectName: '云港仓储升级项目', department: '华南业务部', salesManager: '韩哲', status: '呆滞' as const, amount: 1200, unit: '万元', createdAt: '2026-03-02', lastVisitAt: '2026-04-01', expectedSignAt: '2026-09-30', probability: null, inputProfile: 'crm-history' as const };
-    const observation = { projectId: 'CRM-005', projectName: '北辰综合管廊项目', department: '华东业务部', salesManager: '周岚', status: '跟进中' as const, amount: 1850, unit: '万元', createdAt: '2026-04-26', lastVisitAt: '2026-07-05', expectedSignAt: '2026-11-10', probability: null, inputProfile: 'crm-history' as const };
+    const manualStagnation = { projectId: 'CRM-002', projectName: '云川仓储升级项目', department: '华南业务部', salesManager: '示例经理乙', status: '呆滞' as const, amount: 1200, unit: '万元', createdAt: '2026-03-02', lastVisitAt: '2026-04-01', expectedSignAt: '2026-09-30', probability: null, inputProfile: 'crm-history' as const };
+    const observation = { projectId: 'CRM-005', projectName: '北原综合管廊项目', department: '华东业务部', salesManager: '示例经理甲', status: '跟进中' as const, amount: 1850, unit: '万元', createdAt: '2026-04-26', lastVisitAt: '2026-07-05', expectedSignAt: '2026-11-10', probability: null, inputProfile: 'crm-history' as const };
     const crmAnalysis: AnalysisResult = {
       ...analysis,
       rows: [manualStagnation, observation],

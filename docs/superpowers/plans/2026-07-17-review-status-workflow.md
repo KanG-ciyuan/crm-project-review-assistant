@@ -40,7 +40,7 @@ import {
 } from './review';
 
 const row: ProjectRow = {
-  projectId: 'P-2026-024', projectName: '西南综合管廊项目', department: '营销三部', salesManager: '王宁',
+  projectId: 'P-2026-024', projectName: '远景综合管廊项目', department: '营销三部', salesManager: '示例经理丙',
   status: '跟进中', amount: 50000, unit: '万元', createdAt: '2026-05-18', lastVisitAt: '2026-07-14',
   expectedSignAt: '2026-11-20', probability: 60
 };
@@ -182,9 +182,9 @@ git commit -m "feat: add local review record workflow"
 import type { ReviewRecordMap } from './review';
 
 const reviews: ReviewRecordMap = {
-  'P-2026-024': { projectId: 'P-2026-024', projectName: '西南综合管廊项目', status: '确认数据错误', note: '已通知销售修正金额。', firstReviewedAt: '2026-07-17T09:00:00.000Z', lastReviewedAt: '2026-07-17T09:00:00.000Z', fingerprint: 'x', dataUpdated: false, history: [] },
-  'P-2026-025': { projectId: 'P-2026-025', projectName: '赣州河道治理项目', status: '确认业务风险', note: '安排本周拜访。', firstReviewedAt: '2026-07-17T09:00:00.000Z', lastReviewedAt: '2026-07-17T09:00:00.000Z', fingerprint: 'y', dataUpdated: false, history: [] },
-  'P-2026-026': { projectId: 'P-2026-026', projectName: '南昌轨道维保项目', status: '已忽略', note: '已在专项流程处理。', firstReviewedAt: '2026-07-17T09:00:00.000Z', lastReviewedAt: '2026-07-17T09:00:00.000Z', fingerprint: 'z', dataUpdated: false, history: [] }
+  'P-2026-024': { projectId: 'P-2026-024', projectName: '远景综合管廊项目', status: '确认数据错误', note: '已通知销售修正金额。', firstReviewedAt: '2026-07-17T09:00:00.000Z', lastReviewedAt: '2026-07-17T09:00:00.000Z', fingerprint: 'x', dataUpdated: false, history: [] },
+  'P-2026-025': { projectId: 'P-2026-025', projectName: '云川河道治理项目', status: '确认业务风险', note: '安排本周拜访。', firstReviewedAt: '2026-07-17T09:00:00.000Z', lastReviewedAt: '2026-07-17T09:00:00.000Z', fingerprint: 'y', dataUpdated: false, history: [] },
+  'P-2026-026': { projectId: 'P-2026-026', projectName: '星港轨道维保项目', status: '已忽略', note: '已在专项流程处理。', firstReviewedAt: '2026-07-17T09:00:00.000Z', lastReviewedAt: '2026-07-17T09:00:00.000Z', fingerprint: 'z', dataUpdated: false, history: [] }
 };
 
 it('adds grouped human-review progress while keeping the confirmation disclaimer', () => {
@@ -413,4 +413,3 @@ Expected: tests and build pass; status lists only the intended README change bef
 git add README.md
 git commit -m "docs: explain local review workflow"
 ```
-
