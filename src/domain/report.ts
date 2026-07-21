@@ -40,7 +40,7 @@ export function createReviewReport(analysis: AnalysisResult, reviews: ReviewReco
   const qualityIssues = analysis.issues.filter((issue) => issue.category === '数据质量');
   const businessIssues = analysis.issues.filter((issue) => issue.category === '经营风险');
   const { overview } = analysis;
-  const isCrmHistory = analysis.rows.some((row) => row.inputProfile === 'crm-history');
+  const isCrmHistory = analysis.manualStagnationProjects.length > 0 || analysis.observationProjects.length > 0;
   const followUpDelayedCount = new Set(analysis.issues.filter((issue) => issue.label === '跟进停滞').map((issue) => issue.reviewKey || issue.projectId)).size;
   const expectedSignOverdueCount = new Set(analysis.issues.filter((issue) => issue.label === '签约预期失效').map((issue) => issue.reviewKey || issue.projectId)).size;
   const overviewLine = isCrmHistory

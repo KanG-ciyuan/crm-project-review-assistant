@@ -1,4 +1,4 @@
-import type { ProjectRow } from './analyze';
+import { projectKey, type ProjectRow } from './project';
 
 export const REVIEW_STORAGE_KEY = 'crm-project-review-assistant:review-records:v1';
 
@@ -34,13 +34,16 @@ const nowText = (now: Date) => now.toISOString();
 export function createProjectFingerprint(row: ProjectRow) {
   return JSON.stringify([
     normalized(row.projectId),
+    normalized(row.customerName),
+    normalized(row.projectName),
     normalized(row.amount),
     normalized(row.unit),
     normalized(row.status),
-    normalized(row.probability),
-    normalized(row.lastVisitAt),
+    normalized(row.probabilityBand),
+    normalized(row.lastFollowUpAt),
     normalized(row.expectedSignAt),
-    normalized(row.createdAt)
+    normalized(row.createdAt),
+    normalized(row.latestUpdatedAt)
   ]);
 }
 
@@ -50,7 +53,7 @@ export function reconcileReviewRecords(
   previous: ReviewRecordMap,
   now: Date
 ): ReviewRecordMap {
-  const rowByKey = new Map(rows.map((row) => [row.sourceKey || row.projectId || `${row.projectName}|${row.department}|${row.salesManager}`, row]));
+  const rowByKey = new Map(rows.map((row) => [projectKey(row), row]));
 
   return flaggedKeys.reduce<ReviewRecordMap>((next, reviewKey) => {
     const row = rowByKey.get(reviewKey);
