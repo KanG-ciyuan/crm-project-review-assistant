@@ -170,6 +170,11 @@ export function ImportWizard({ inspection, onReady, capabilities = [], onConfigu
     });
   }
 
+  function returnTo(nextStep: 1 | 2 | 3) {
+    onConfigurationChange?.();
+    setStep(nextStep);
+  }
+
   return <section className="import-wizard" aria-label="Excel 导入向导">
     <ol className="wizard-steps" aria-label="导入步骤">
       {['确认表头', '字段对应', '统一口径', '确认分析'].map((label, index) => <li key={label} className={step === index + 1 ? 'active' : step > index + 1 ? 'done' : ''}><span>{index + 1}</span>{label}</li>)}
@@ -201,7 +206,7 @@ export function ImportWizard({ inspection, onReady, capabilities = [], onConfigu
         {mapping.mode === 'custom' && <label>自定义字段名称<input aria-label={`${mapping.sourceHeader}自定义字段名称`} value={mapping.customName ?? ''} onChange={(event) => updateMapping(index, { customName: event.target.value })} /></label>}
       </article>)}</div>
       {message && <p className="wizard-error" role="alert">{message}</p>}
-      <div className="wizard-actions"><button className="secondary" type="button" onClick={() => setStep(1)}>返回</button><button className="primary" type="button" onClick={confirmMappings}>确认字段关系</button></div>
+      <div className="wizard-actions"><button className="secondary" type="button" onClick={() => returnTo(1)}>返回</button><button className="primary" type="button" onClick={confirmMappings}>确认字段关系</button></div>
     </div>}
 
     {step === 3 && <div className="wizard-panel">
@@ -217,7 +222,7 @@ export function ImportWizard({ inspection, onReady, capabilities = [], onConfigu
         {hasMixedUnits ? <div className="unit-block"><strong>检测到多个金额单位：{unitValues.join('、')}</strong><p>首版仅支持同一工作表使用统一金额单位，请先在 Excel 中统一后重新导入。</p></div> : <label className="enum-row"><span>{unitValues[0] ? `源值：${unitValues[0]}` : '该金额列使用'}</span><select aria-label="统一金额单位" value={amountUnit} onChange={(event) => { setAmountUnit(event.target.value as ValueMappings['amountUnit']); onConfigurationChange?.(); }}><option value="">请选择金额单位</option>{UNITS.map((unit) => <option key={unit}>{unit}</option>)}</select></label>}
       </EnumSection>}
       {message && <p className="wizard-error" role="alert">{message}</p>}
-      <div className="wizard-actions"><button className="secondary" type="button" onClick={() => setStep(2)}>返回</button><button className="primary" type="button" onClick={confirmValues} disabled={hasMixedUnits}>确认状态口径</button></div>
+      <div className="wizard-actions"><button className="secondary" type="button" onClick={() => returnTo(2)}>返回</button><button className="primary" type="button" onClick={confirmValues} disabled={hasMixedUnits}>确认状态口径</button></div>
     </div>}
 
     {step === 4 && <div className="wizard-panel">
@@ -225,7 +230,7 @@ export function ImportWizard({ inspection, onReady, capabilities = [], onConfigu
       <div className="confirmation-grid"><article><span>标准字段</span><strong>{mappings.filter((mapping) => mapping.mode === 'standard').length}</strong></article><article><span>自定义字段</span><strong>{mappings.filter((mapping) => mapping.mode === 'custom').length}</strong></article><article><span>忽略字段</span><strong>{mappings.filter((mapping) => mapping.mode === 'ignore').length}</strong></article></div>
       <section className="capability-preview"><h3>可执行规则</h3>{capabilities.length === 0 ? <p>待后续规则包加载</p> : <ul>{capabilities.map((capability) => <li key={capability.ruleId}><b>{capability.name ?? capability.ruleId}</b><span>{capability.available ? '可执行' : `跳过：缺少${capability.missingFields.map((field) => FIELD_LABELS[field]).join('、')}`}</span></li>)}</ul>}</section>
       <p className="wizard-help">点击后将按已确认的字段关系和统一口径直接运行规则分析。</p>
-      <div className="wizard-actions"><button className="secondary" type="button" onClick={() => setStep(3)}>返回</button><button className="primary" type="button" onClick={finish}>开始规则分析</button></div>
+      <div className="wizard-actions"><button className="secondary" type="button" onClick={() => returnTo(3)}>返回</button><button className="primary" type="button" onClick={finish}>开始规则分析</button></div>
     </div>}
   </section>;
 }

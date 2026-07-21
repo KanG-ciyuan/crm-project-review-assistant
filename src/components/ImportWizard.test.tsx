@@ -81,16 +81,17 @@ describe('ImportWizard', () => {
     expect(screen.getByRole('button', { name: '确认状态口径' })).toBeDisabled();
   });
 
-  it('keeps a blank source unit unknown when a unit column is mapped', async () => {
+  it('applies the confirmed source unit to non-empty cells and keeps blank cells unknown', async () => {
     const user = userEvent.setup();
     const onReady = vi.fn();
     render(<ImportWizard inspection={inspection([
       ['项目名称', '储备金额', '金额单位'],
-      ['医院数改', 1200, '万元'],
+      ['医院数改', 1200, '千元'],
       ['园区改造', 300, '']
     ])} onReady={onReady} />);
 
     await confirmHeaderAndFields(user);
+    await user.selectOptions(screen.getByLabelText('统一金额单位'), '万元');
     await user.click(screen.getByRole('button', { name: '确认状态口径' }));
     await user.click(screen.getByRole('button', { name: '开始规则分析' }));
 
@@ -122,6 +123,32 @@ describe('ImportWizard', () => {
       rows: [expect.objectContaining({ projectId: 'A-1', status: '跟进中', amount: 1200, unit: '万元' })],
       source: { sheetName: '商机明细', headerRowIndex: 0 }
     }));
+  });
+
+  it('invalidates the previous analysis from every return button', async () => {
+    const user = userEvent.setup();
+    const onConfigurationChange = vi.fn();
+    render(<ImportWizard inspection={inspection([
+      ['项目名称'],
+      ['医院数改']
+    ])} onReady={vi.fn()} onConfigurationChange={onConfigurationChange} />);
+
+    await user.click(screen.getByRole('button', { name: '确认表头行' }));
+    onConfigurationChange.mockClear();
+    await user.click(screen.getByRole('button', { name: '返回' }));
+    expect(onConfigurationChange).toHaveBeenCalledTimes(1);
+
+    await user.click(screen.getByRole('button', { name: '确认表头行' }));
+    await user.click(screen.getByRole('button', { name: '确认字段关系' }));
+    onConfigurationChange.mockClear();
+    await user.click(screen.getByRole('button', { name: '返回' }));
+    expect(onConfigurationChange).toHaveBeenCalledTimes(1);
+
+    await user.click(screen.getByRole('button', { name: '确认字段关系' }));
+    await user.click(screen.getByRole('button', { name: '确认状态口径' }));
+    onConfigurationChange.mockClear();
+    await user.click(screen.getByRole('button', { name: '返回' }));
+    expect(onConfigurationChange).toHaveBeenCalledTimes(1);
   });
 
   it('shows source fields, sample values, mapping mode, and targets in the mapping grid', async () => {

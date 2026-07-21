@@ -97,8 +97,5 @@ it('clears an existing analysis when the confirmed mapping is edited', async () 
   expect(screen.getByRole('heading', { name: '数据质量与经营风险' })).toBeInTheDocument();
 
   await user.click(screen.getByRole('button', { name: '返回' }));
-  await user.click(screen.getByRole('button', { name: '返回' }));
-  await user.selectOptions(screen.getByLabelText('项目名称处理方式'), 'custom');
-
   expect(screen.queryByRole('heading', { name: '数据质量与经营风险' })).not.toBeInTheDocument();
 });

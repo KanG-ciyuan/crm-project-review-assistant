@@ -250,7 +250,7 @@ function assignStandardField(
     case 'amount': row.amount = toAmount(value); break;
     case 'status': row.status = toStatus(value, values); break;
     case 'probabilityBand': row.probabilityBand = toProbability(value, values); break;
-    case 'unit': row.unit = toUnit(value); break;
+    case 'unit': row.unit = isPresent(value) ? toUnit(values.amountUnit) : ''; break;
     case 'createdAt':
     case 'lastFollowUpAt':
     case 'expectedSignAt':

@@ -122,9 +122,9 @@ describe('field mappings', () => {
     expect(amountInWan(row)).toBeNull();
   });
 
-  it('does not fill blank row units when a source unit column is mapped', () => {
+  it('applies a confirmed unit to non-empty source unit cells without filling blanks', () => {
     const rows = applyMappings(
-      [{ 金额: 1200, 单位: '万元' }, { 金额: 300, 单位: '' }],
+      [{ 金额: 1200, 单位: '千元' }, { 金额: 300, 单位: '' }],
       [
         { sourceHeader: '金额', mode: 'standard', targetField: 'amount' },
         { sourceHeader: '单位', mode: 'standard', targetField: 'unit' }
