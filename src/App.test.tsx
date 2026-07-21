@@ -79,6 +79,45 @@ it('opens the guided mapper for an arbitrary worksheet instead of requiring fixe
   expect(screen.queryByText('缺少必填字段')).not.toBeInTheDocument();
 });
 
+it('restarts the wizard when a same-name file and sheet are uploaded again', async () => {
+  const user = userEvent.setup();
+  const firstWorkbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(firstWorkbook, XLSX.utils.aoa_to_sheet([
+    ['标题'], ['说明'], ['导出时间'], ['空行'],
+    ['项目名称', '销售经理'],
+    ['旧项目', '销售甲']
+  ]), '商机表');
+  const secondWorkbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(secondWorkbook, XLSX.utils.aoa_to_sheet([
+    ['项目名称', '销售经理'],
+    ['新项目', '销售乙']
+  ]), '商机表');
+  vi.spyOn(workbookApi, 'inspectWorkbook')
+    .mockResolvedValueOnce({ workbook: firstWorkbook, sheetNames: ['商机表'] })
+    .mockResolvedValueOnce({ workbook: secondWorkbook, sheetNames: ['商机表'] });
+
+  render(<App />);
+  const input = screen.getByLabelText('选择 .xlsx 文件');
+  await user.upload(input, new File(['first'], '商机.xlsx'));
+  expect(await screen.findByLabelText('表头所在行')).toHaveValue('4');
+
+  await user.upload(input, new File(['second'], '商机.xlsx'));
+  expect(await screen.findByLabelText('表头所在行')).toHaveValue('0');
+  expect(screen.getByText('新项目')).toBeInTheDocument();
+});
+
+it('keeps the file picker reachable from the keyboard', async () => {
+  const user = userEvent.setup();
+  render(<App />);
+  const input = screen.getByLabelText('选择 .xlsx 文件');
+
+  expect(input).not.toHaveAttribute('hidden');
+  expect(input).not.toHaveAttribute('tabindex', '-1');
+  expect(input).toHaveClass('visually-hidden-file');
+  await user.tab();
+  expect(input).toHaveFocus();
+});
+
 it('clears an existing analysis when the confirmed mapping is edited', async () => {
   const user = userEvent.setup();
   const workbook = XLSX.utils.book_new();

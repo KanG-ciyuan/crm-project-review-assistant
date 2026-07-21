@@ -16,6 +16,7 @@ export default function App() {
   const [inspection, setInspection] = useState<WorkbookInspection | null>(null);
   const [fileName, setFileName] = useState('');
   const [sheetName, setSheetName] = useState('');
+  const [importRevision, setImportRevision] = useState(0);
   const [importReady, setImportReady] = useState<ImportReadyPayload | null>(null);
   const [thresholds, setThresholds] = useState(defaultThresholds);
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
@@ -39,6 +40,7 @@ export default function App() {
       setImportReady(null);
       setReport('');
       const next = await inspectWorkbook(file);
+      setImportRevision((current) => current + 1);
       setInspection(next);
       setSheetName(next.sheetNames[0]);
       setFileName(file.name);
@@ -106,7 +108,7 @@ export default function App() {
   return <div className="app-shell">
     <aside className="sidebar">
       <div className="brand"><div className="brand-mark">CR</div><div><strong>CRM 项目运营复盘</strong><span>储备项目分析助手</span></div></div>
-      <div className="side-section"><p className="side-label">导入 Excel</p><label className="upload-button"><Upload size={16} /> 选择 .xlsx 文件<input aria-label="选择 .xlsx 文件" type="file" accept=".xlsx" onChange={(event) => onFileChange(event.target.files?.[0] ?? null)} /></label>
+      <div className="side-section"><p className="side-label">导入 Excel</p><label className="upload-button"><Upload size={16} /> 选择 .xlsx 文件<input className="visually-hidden-file" aria-label="选择 .xlsx 文件" type="file" accept=".xlsx" onChange={(event) => onFileChange(event.target.files?.[0] ?? null)} /></label>
         {fileName && <div className="file-state"><FileSpreadsheet size={17} /><div><b>{fileName}</b><span>{importReady?.rows.length ?? '待确认'} 条项目记录</span></div></div>}
         {error && <p className="error">{error}</p>}
       </div>
@@ -119,7 +121,7 @@ export default function App() {
     <main className="content">
       <header><div><h1>储备项目运营复盘助手</h1><p>以固定规则发现数据质量问题和经营风险，最终结论由业务人员确认。</p></div></header>
       {!inspection && <section className="empty import-guide"><FileSpreadsheet size={36} /><h2>上传 CRM 储备项目表</h2><p>支持未加密的 .xlsx 文件，可在导入向导中确认表头、字段关系和业务口径。</p><a className="sample-download" href="/CRM历史项目表-脱敏适配样表.xlsx" download><Download size={15} /> 下载脱敏示例表</a></section>}
-      {sheetInspection && <ImportWizard key={`${fileName}:${sheetName}`} inspection={sheetInspection} onReady={startAnalysis} onConfigurationChange={clearImportedAnalysis} />}
+      {sheetInspection && <ImportWizard key={`${importRevision}:${fileName}:${sheetName}`} inspection={sheetInspection} onReady={startAnalysis} onConfigurationChange={clearImportedAnalysis} />}
       {analysis && <>
         <section className="metrics">
           <Metric label="项目总数" value={analysis.overview.projectCount} sub="本次导入" />

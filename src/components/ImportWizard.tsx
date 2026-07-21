@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { CanonicalFieldKey, ProbabilityBand, ProjectRow, ProjectStatus } from '../domain/project';
 import {
   applyMappings,
@@ -81,16 +81,6 @@ export function ImportWizard({ inspection, onReady, capabilities = [], onConfigu
   const [amountUnit, setAmountUnit] = useState<ValueMappings['amountUnit']>('');
   const [message, setMessage] = useState('');
 
-  useEffect(() => {
-    setStep(1);
-    setHeaderRowIndex(inspection.candidateHeaderRows[0] ?? 0);
-    setMappings([]);
-    setStatuses({});
-    setProbabilities({});
-    setAmountUnit('');
-    setMessage('');
-  }, [inspection]);
-
   const records = useMemo(
     () => readSheetRecords(inspection.matrix, headerRowIndex),
     [inspection.matrix, headerRowIndex]
@@ -99,13 +89,17 @@ export function ImportWizard({ inspection, onReady, capabilities = [], onConfigu
     if (records[0]) return Object.keys(records[0]);
     return inspection.matrix[headerRowIndex]?.map((value, index) => presentText(value) || `未命名列${index + 1}`) ?? [];
   }, [headerRowIndex, inspection.matrix, records]);
+  const sourceValuesByHeader = useMemo(
+    () => new Map(headers.map((header) => [header, distinctValues(records, header)])),
+    [headers, records]
+  );
   const statusHeader = mappings.find((mapping) => mapping.mode === 'standard' && mapping.targetField === 'status')?.sourceHeader;
   const probabilityHeader = mappings.find((mapping) => mapping.mode === 'standard' && mapping.targetField === 'probabilityBand')?.sourceHeader;
   const unitHeader = mappings.find((mapping) => mapping.mode === 'standard' && mapping.targetField === 'unit')?.sourceHeader;
   const mapsAmount = mappings.some((mapping) => mapping.mode === 'standard' && mapping.targetField === 'amount');
-  const statusValues = useMemo(() => distinctValues(records, statusHeader), [records, statusHeader]);
-  const probabilityValues = useMemo(() => distinctValues(records, probabilityHeader), [records, probabilityHeader]);
-  const unitValues = useMemo(() => distinctValues(records, unitHeader), [records, unitHeader]);
+  const statusValues = statusHeader ? sourceValuesByHeader.get(statusHeader) ?? [] : [];
+  const probabilityValues = probabilityHeader ? sourceValuesByHeader.get(probabilityHeader) ?? [] : [];
+  const unitValues = unitHeader ? sourceValuesByHeader.get(unitHeader) ?? [] : [];
   const hasMixedUnits = unitValues.length > 1;
 
   function confirmHeader() {
@@ -157,8 +151,8 @@ export function ImportWizard({ inspection, onReady, capabilities = [], onConfigu
     amountUnit
   };
   const canonicalRows = useMemo(
-    () => applyMappings(records, mappings, valueMappings, inspection.sheetName),
-    [amountUnit, inspection.sheetName, mappings, probabilities, records, statuses]
+    () => step === 4 ? applyMappings(records, mappings, valueMappings, inspection.sheetName) : [],
+    [amountUnit, inspection.sheetName, mappings, probabilities, records, statuses, step]
   );
 
   function finish() {
@@ -193,7 +187,7 @@ export function ImportWizard({ inspection, onReady, capabilities = [], onConfigu
       <div className="wizard-heading"><div><p>第 2 步</p><h2>确认字段对应关系</h2></div><span>{headers.length} 个源字段</span></div>
       <p className="wizard-help">每列可作为标准字段、自定义字段或忽略。未识别的字段默认保留为自定义字段。</p>
       <div className="mapping-grid">{mappings.map((mapping, index) => <article className="mapping-card" key={mapping.sourceHeader} data-testid={`mapping-${mapping.sourceHeader}`}>
-        <div className="mapping-source"><span>源字段</span><strong>{mapping.sourceHeader}</strong><small>{distinctValues(records, mapping.sourceHeader).slice(0, 3).join('、') || '样例为空'}</small></div>
+        <div className="mapping-source"><span>源字段</span><strong>{mapping.sourceHeader}</strong><small>{sourceValuesByHeader.get(mapping.sourceHeader)?.slice(0, 3).join('、') || '样例为空'}</small></div>
         <label>处理方式<select aria-label={`${mapping.sourceHeader}处理方式`} value={mapping.mode} onChange={(event) => {
           const mode = event.target.value as ColumnMapping['mode'];
           updateMapping(index, mode === 'standard'
