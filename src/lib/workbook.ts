@@ -1,5 +1,5 @@
 import * as XLSX from 'xlsx';
-import type { ProjectRow, ProjectStatus } from '../domain/analyze';
+import type { CustomFieldValue, ProjectRow, ProjectStatus } from '../domain/project';
 
 export const REQUIRED_HEADERS = ['项目编号', '项目名称', '部门', '销售经理', '项目状态', '储备金额', '金额单位', '创建日期', '最近拜访日期', '预计签约日期', '成单概率'] as const;
 const CRM_HEADERS = ['部门', '销售经理', '创建日期', '最近拜访时间', '拜访间隔周期（天）', '项目名称', '项目编码', '项目状态', '成单概率', '储备金额（万元）', '预计合同签订时间'] as const;
@@ -15,6 +15,12 @@ export interface HeaderValidation {
 export interface WorkbookInspection {
   workbook: XLSX.WorkBook;
   sheetNames: string[];
+}
+
+export interface RawSheetInspection {
+  sheetName: string;
+  matrix: unknown[][];
+  candidateHeaderRows: number[];
 }
 
 export interface SheetParseResult {
@@ -56,16 +62,20 @@ const toAmount = (value: unknown): number | null => {
   return Number.isFinite(amount) ? amount : null;
 };
 
-const toProbability = (value: unknown): number | null => {
-  if (!isPresent(value)) return null;
+const toProbabilityBand = (value: unknown): ProjectRow['probabilityBand'] => {
+  if (!isPresent(value)) return '未知';
   const probability = Number(String(value).replace('%', '').trim());
-  if (!Number.isFinite(probability)) return null;
-  return probability > 0 && probability <= 1 ? probability * 100 : probability;
+  if (!Number.isFinite(probability)) return '未知';
+  const percent = probability > 0 && probability <= 1 ? probability * 100 : probability;
+  if (percent <= 50) return '低概率';
+  if (percent <= 70) return '中等概率';
+  if (percent <= 80) return '较高概率';
+  return percent <= 100 ? '临近签约' : '未知';
 };
 
 const toText = (value: unknown): string => isPresent(value) ? String(value).trim() : '';
 const crmText = (value: unknown) => { const text = toText(value); return text === '无' ? '' : text; };
-const PROBABILITY_BANDS: Record<string, NonNullable<ProjectRow['probabilityBand']>> = { '询价类': '低概率', '1%-50%': '低概率', '51%-70%': '中等概率', '71%-80%': '较高概率', '81%-100%': '临近签约' };
+const PROBABILITY_BANDS: Record<string, NonNullable<ProjectRow['probabilityBand']>> = { '询价类': '询价类', '1%-50%': '低概率', '51%-70%': '中等概率', '71%-80%': '较高概率', '81%-100%': '临近签约' };
 const band = (value: string): ProjectRow['probabilityBand'] => PROBABILITY_BANDS[value] ?? '未知';
 
 const pick = (source: Record<string, unknown>, header: string) => source[header];
@@ -75,6 +85,51 @@ export async function inspectWorkbook(file: File): Promise<WorkbookInspection> {
   const workbook = XLSX.read(await file.arrayBuffer(), { type: 'array', cellDates: true });
   if (workbook.SheetNames.length === 0) throw new Error('该文件不包含可读取的工作表');
   return { workbook, sheetNames: workbook.SheetNames };
+}
+
+export function inspectSheet(workbook: XLSX.WorkBook, sheetName: string): RawSheetInspection {
+  const worksheet = workbook.Sheets[sheetName];
+  if (!worksheet) throw new Error('未找到所选工作表');
+
+  const matrix = XLSX.utils.sheet_to_json<unknown[]>(worksheet, {
+    header: 1,
+    defval: null,
+    raw: true
+  });
+  const firstTenNonEmptyRows = matrix
+    .map((row, index) => ({ row, index }))
+    .filter(({ row }) => row.some(isPresent))
+    .slice(0, 10);
+  const candidateHeaderRows = firstTenNonEmptyRows
+    .filter(({ row }) => row.filter(isPresent).length >= 2)
+    .map(({ index }) => index);
+
+  return { sheetName, matrix, candidateHeaderRows };
+}
+
+function uniqueHeaders(row: unknown[]): string[] {
+  const counts = new Map<string, number>();
+  return row.map((cell, index) => {
+    const base = String(cell ?? '').trim() || `未命名列${index + 1}`;
+    const count = (counts.get(base) ?? 0) + 1;
+    counts.set(base, count);
+    return count === 1 ? base : `${base} (${count})`;
+  });
+}
+
+export function readSheetRecords(
+  matrix: unknown[][],
+  headerRowIndex: number
+): Array<Record<string, unknown>> {
+  if (!Number.isInteger(headerRowIndex) || headerRowIndex < 0 || headerRowIndex >= matrix.length) {
+    throw new Error('请选择有效的表头行');
+  }
+
+  const headers = uniqueHeaders(matrix[headerRowIndex]);
+  return matrix
+    .slice(headerRowIndex + 1)
+    .filter((row) => row.some(isPresent))
+    .map((row) => Object.fromEntries(headers.map((header, index) => [header, row[index] ?? null])));
 }
 
 export function parseSelectedSheet(workbook: XLSX.WorkBook, sheetName: string): SheetParseResult {
@@ -89,31 +144,39 @@ export function parseSelectedSheet(workbook: XLSX.WorkBook, sheetName: string): 
   const validation = profile ? { valid: true, missing: [] } : validateHeaders(headers);
   const dataRows = matrix.slice(headerRowIndex + 1).filter((row) => row.some(isPresent));
   const objects = dataRows.map((row) => Object.fromEntries(headers.map((header, index) => [header, row[index]])));
-  const rows: ProjectRow[] = objects.map((source, index) => profile === 'crm-history' ? ({
+  const rows = objects.map<ProjectRow>((source, index) => profile === 'crm-history' ? ({
     sourceKey: `crm-history:${index + 1}`, projectId: crmText(pick(source, '项目编码')), projectName: crmText(pick(source, '项目名称')),
+    customerName: crmText(pick(source, '客户名称')),
     department: crmText(pick(source, '部门')), salesManager: crmText(pick(source, '销售经理')), status: crmText(pick(source, '项目状态')) as ProjectStatus,
     amount: toAmount(pick(source, '储备金额（万元）')), unit: '万元', createdAt: toDateString(pick(source, '创建日期')),
-    lastVisitAt: toDateString(pick(source, '最近拜访时间')), visitIntervalDays: toAmount(pick(source, '拜访间隔周期（天）')),
-    expectedSignAt: toDateString(pick(source, '预计合同签订时间')), probability: null, probabilityLabel: crmText(pick(source, '成单概率')),
-    probabilityBand: band(crmText(pick(source, '成单概率'))), inputProfile: 'crm-history', industry: crmText(pick(source, '行业')) || null,
-    region: crmText(pick(source, '区域')) || null, projectType: crmText(pick(source, '项目类型')) || null, projectLevel: crmText(pick(source, '项目等级')) || null
+    lastFollowUpAt: toDateString(pick(source, '最近拜访时间')),
+    expectedSignAt: toDateString(pick(source, '预计合同签订时间')),
+    probabilityBand: band(crmText(pick(source, '成单概率'))), industry: crmText(pick(source, '行业')),
+    region: crmText(pick(source, '区域')), projectType: crmText(pick(source, '项目类型')), projectLevel: crmText(pick(source, '项目等级')),
+    latestUpdatedAt: null,
+    customFields: {
+      '拜访间隔周期（天）': toAmount(pick(source, '拜访间隔周期（天）'))
+    } as Record<string, CustomFieldValue>
   }) : ({
     sourceKey: `standard:${index + 1}`,
     projectId: toText(pick(source, '项目编号')),
     projectName: toText(pick(source, '项目名称')),
+    customerName: toText(pick(source, '客户名称')),
     department: toText(pick(source, '部门')),
     salesManager: toText(pick(source, '销售经理')),
     status: toText(pick(source, '项目状态')) as ProjectStatus,
     amount: toAmount(pick(source, '储备金额')),
     unit: toText(pick(source, '金额单位')),
     createdAt: toDateString(pick(source, '创建日期')),
-    lastVisitAt: toDateString(pick(source, '最近拜访日期')),
+    lastFollowUpAt: toDateString(pick(source, '最近拜访日期')),
     expectedSignAt: toDateString(pick(source, '预计签约日期')),
-    probability: toProbability(pick(source, '成单概率')),
-    industry: toText(pick(source, '行业')) || null,
-    region: toText(pick(source, '区域/省份')) || null,
-    projectType: toText(pick(source, '项目类型')) || null,
-    projectLevel: toText(pick(source, '项目等级')) || null, inputProfile: 'standard'
+    probabilityBand: toProbabilityBand(pick(source, '成单概率')),
+    industry: toText(pick(source, '行业')),
+    region: toText(pick(source, '区域/省份')),
+    projectType: toText(pick(source, '项目类型')),
+    projectLevel: toText(pick(source, '项目等级')),
+    latestUpdatedAt: null,
+    customFields: {} as Record<string, CustomFieldValue>
   }));
 
   return { profile, headerRowIndex, headers, validation, preview: objects.slice(0, 5), rows };

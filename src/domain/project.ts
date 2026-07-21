@@ -38,7 +38,8 @@ export function amountInWan(row: Pick<ProjectRow, 'amount' | 'unit'>): number | 
   if (row.amount === null || !Number.isFinite(row.amount)) return null;
   if (row.unit === '元') return row.amount / 10_000;
   if (row.unit === '亿元') return row.amount * 10_000;
-  return row.amount;
+  if (row.unit === '万元') return row.amount;
+  return null;
 }
 
 export function parseIsoDate(value: string | null): Date | null {

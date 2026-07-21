@@ -2,8 +2,8 @@ import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, expect, it, vi } from 'vitest';
 import App from './App';
-import type { ProjectRow } from './domain/analyze';
 import { loadReviewRecords, reconcileReviewRecords, saveReviewRecords, updateReviewRecord } from './domain/review';
+import { makeProject } from './test/fixtures';
 
 afterEach(cleanup);
 
@@ -13,7 +13,8 @@ it('retains a user-selected review status after a page-style storage reload', ()
     getItem: (key: string) => values.get(key) ?? null,
     setItem: (key: string, value: string) => values.set(key, value)
   };
-  const row = {
+  const row = makeProject({
+    sourceKey: 'P-1',
     projectId: 'P-1',
     projectName: '项目',
     department: '部门',
@@ -22,10 +23,10 @@ it('retains a user-selected review status after a page-style storage reload', ()
     amount: 10,
     unit: '万元',
     createdAt: '2026-07-01',
-    lastVisitAt: '2026-07-10',
+    lastFollowUpAt: '2026-07-10',
     expectedSignAt: '2026-08-01',
-    probability: 50
-  } satisfies ProjectRow;
+    probabilityBand: '低概率'
+  });
   const pending = reconcileReviewRecords([row], ['P-1'], {}, new Date('2026-07-17T09:00:00Z'));
   const reviewed = updateReviewRecord(pending, 'P-1', { status: '已忽略', note: '已处理。' }, new Date('2026-07-17T10:00:00Z'));
 

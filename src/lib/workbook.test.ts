@@ -1,8 +1,43 @@
 import { describe, expect, it } from 'vitest';
 import * as XLSX from 'xlsx';
-import { findHeaderRow, parseSelectedSheet, validateHeaders } from './workbook';
+import { findHeaderRow, inspectSheet, parseSelectedSheet, readSheetRecords, validateHeaders } from './workbook';
 
 describe('workbook helpers', () => {
+  it('returns candidate header rows without requiring known column names', () => {
+    const workbook = XLSX.utils.book_new();
+    const sheet = XLSX.utils.aoa_to_sheet([
+      ['华东销售中心项目清单'],
+      ['商机名称', '业务负责人', '客户', '最后联系时间', '预计成交时间', '金额'],
+      ['医院数改', '销售甲', '华城医院', '2026-07-01', '2026-08-01', 350]
+    ]);
+    XLSX.utils.book_append_sheet(workbook, sheet, '商机明细');
+
+    const inspected = inspectSheet(workbook, '商机明细');
+
+    expect(inspected.candidateHeaderRows).toContain(1);
+    expect(readSheetRecords(inspected.matrix, 1)[0]).toMatchObject({ 商机名称: '医院数改' });
+  });
+
+  it('trims and disambiguates blank or repeated headers without losing source values', () => {
+    const records = readSheetRecords([
+      [' 项目名称 ', '', '备注', '备注'],
+      ['医院数改', '临时值', '首次', '再次']
+    ], 0);
+
+    expect(records[0]).toEqual({ 项目名称: '医院数改', 未命名列2: '临时值', 备注: '首次', '备注 (2)': '再次' });
+  });
+
+  it('reads the legacy CRM history sample without fixed-profile parsing', () => {
+    const workbook = XLSX.readFile('sample-data/CRM历史项目表-脱敏适配样表.xlsx', { cellDates: true });
+    const inspected = inspectSheet(workbook, '10-储备项目报备表（跟进中和呆滞）');
+    const headerRowIndex = inspected.matrix.findIndex((row) => row.includes('项目编码'));
+    const records = readSheetRecords(inspected.matrix, headerRowIndex);
+
+    expect(records.length).toBeGreaterThan(0);
+    expect(records[0]).toHaveProperty('项目编码');
+    expect(records[0]).toHaveProperty('储备金额（万元）');
+  });
+
   it('finds the standard header after a title row', () => {
     const matrix = [
       ['CRM 储备项目运营复盘助手 - 脱敏模拟数据'],
@@ -26,7 +61,7 @@ describe('workbook helpers', () => {
     expect(findHeaderRow(matrix)).toBe(2);
     expect(matrix.slice(3).filter((row) => row.some((cell) => cell !== null && cell !== '')).length).toBe(30);
     const parsed = parseSelectedSheet(workbook, '项目明细（标准导入）');
-    expect(parsed.rows.find((row) => row.projectId === 'P-2026-024')?.probability).toBe(60);
+    expect(parsed.rows.find((row) => row.projectId === 'P-2026-024')?.probabilityBand).toBe('中等概率');
   });
 
   it('recognizes CRM history headers and normalizes confirmed business fields', () => {
@@ -43,7 +78,7 @@ describe('workbook helpers', () => {
 
     expect(parsed.profile).toBe('crm-history');
     expect(parsed.validation.valid).toBe(true);
-    expect(parsed.rows[0]).toMatchObject({ projectId: 'CRM-001', unit: '万元', visitIntervalDays: 31, probabilityBand: '低概率', sourceKey: 'crm-history:1' });
+    expect(parsed.rows[0]).toMatchObject({ projectId: 'CRM-001', unit: '万元', probabilityBand: '低概率', sourceKey: 'crm-history:1', customFields: { '拜访间隔周期（天）': 31 } });
     expect(parsed.rows[1]).toMatchObject({ projectId: '', projectName: '', status: '呆滞', probabilityBand: '临近签约' });
   });
 });
