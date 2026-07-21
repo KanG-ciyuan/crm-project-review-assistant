@@ -84,6 +84,7 @@ export function reconcileReviewRecords(
 
     next[reviewKey] = {
       ...prior,
+      projectId: row.projectId || '未填写项目编号',
       projectName: row.projectName,
       status: '待复核',
       note: '',

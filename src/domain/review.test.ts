@@ -69,6 +69,31 @@ describe('review records', () => {
       .not.toBe(createProjectFingerprint(base));
   });
 
+  it('synchronizes a changed project ID and preserves the prior decision in history', () => {
+    const reviewed = updateReviewRecord(
+      reconcileReviewRecords([row], ['standard:1'], {}, new Date('2026-07-17T09:00:00Z')),
+      'standard:1',
+      { status: '确认业务风险', note: '等待客户预算确认。' },
+      new Date('2026-07-17T10:00:00Z')
+    );
+    const next = reconcileReviewRecords(
+      [{ ...row, projectId: 'P-2026-024-NEW' }],
+      ['standard:1'],
+      reviewed,
+      new Date('2026-07-18T09:00:00Z')
+    );
+
+    expect(next['standard:1']).toMatchObject({
+      projectId: 'P-2026-024-NEW',
+      status: '待复核',
+      dataUpdated: true
+    });
+    expect(next['standard:1'].history).toContainEqual(expect.objectContaining({
+      status: '确认业务风险',
+      note: '等待客户预算确认。'
+    }));
+  });
+
   it('round-trips records through storage and ignores malformed saved values', () => {
     const storage = memoryStorage();
     const records: ReviewRecordMap = reconcileReviewRecords([row], ['standard:1'], {}, new Date('2026-07-17T09:00:00Z'));
