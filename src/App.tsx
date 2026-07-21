@@ -1,11 +1,12 @@
 import { useMemo, useState } from 'react';
 import { Copy, Download, FileSpreadsheet, GitFork, Mail, ShieldCheck, Upload } from 'lucide-react';
 import './review.css';
+import { ImportWizard, type ImportReadyPayload } from './components/ImportWizard';
 import { analyzeProjects, type AnalysisResult, type Thresholds } from './domain/analyze';
 import { groupIssuesByProject, type ProjectIssueGroup } from './domain/issues';
 import { createReviewReport } from './domain/report';
 import { REVIEW_STATUSES, loadReviewRecords, reconcileReviewRecords, saveReviewRecords, updateReviewRecord, type ReviewRecordMap, type ReviewStatus } from './domain/review';
-import { inspectWorkbook, parseSelectedSheet, type WorkbookInspection } from './lib/workbook';
+import { inspectSheet, inspectWorkbook, type WorkbookInspection } from './lib/workbook';
 
 const defaultThresholds: Thresholds = { followUpDays: 14, longReserveDays: 90, absoluteAmountLimitWan: 10000 };
 
@@ -15,6 +16,7 @@ export default function App() {
   const [inspection, setInspection] = useState<WorkbookInspection | null>(null);
   const [fileName, setFileName] = useState('');
   const [sheetName, setSheetName] = useState('');
+  const [importReady, setImportReady] = useState<ImportReadyPayload | null>(null);
   const [thresholds, setThresholds] = useState(defaultThresholds);
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
   const [report, setReport] = useState('');
@@ -24,8 +26,8 @@ export default function App() {
   const [reviewStatusFilter, setReviewStatusFilter] = useState<'全部' | ReviewStatus>('全部');
   const [feedbackCopied, setFeedbackCopied] = useState(false);
 
-  const parsed = useMemo(() => inspection && sheetName ? parseSelectedSheet(inspection.workbook, sheetName) : null, [inspection, sheetName]);
-  const isCrmHistory = parsed?.profile === 'crm-history';
+  const sheetInspection = useMemo(() => inspection && sheetName ? inspectSheet(inspection.workbook, sheetName) : null, [inspection, sheetName]);
+  const isCrmHistory = importReady?.mappings.some((mapping) => mapping.sourceHeader === '项目编码') ?? false;
   const visibleIssues = useMemo(() => analysis?.issues.filter((issue) => category === '全部' || issue.category === category) ?? [], [analysis, category]);
   const visibleIssueGroups = useMemo(() => groupIssuesByProject(visibleIssues).filter((group) => reviewStatusFilter === '全部' || (reviewRecords[group.reviewKey]?.status ?? '待复核') === reviewStatusFilter), [visibleIssues, reviewRecords, reviewStatusFilter]);
 
@@ -34,6 +36,7 @@ export default function App() {
     try {
       setError('');
       setAnalysis(null);
+      setImportReady(null);
       setReport('');
       const next = await inspectWorkbook(file);
       setInspection(next);
@@ -41,22 +44,31 @@ export default function App() {
       setFileName(file.name);
     } catch (caught) {
       setInspection(null);
+      setImportReady(null);
+      setSheetName('');
+      setFileName('');
       setError(caught instanceof Error ? caught.message : '文件读取失败，请重新选择文件');
     }
   }
 
-  function startAnalysis() {
-    if (!parsed?.validation.valid) return;
+  function startAnalysis(payload: ImportReadyPayload) {
     const now = new Date();
-    const result = analyzeProjects(parsed.rows, thresholds, now);
+    const result = analyzeProjects(payload.rows, thresholds, now);
     const groups = groupIssuesByProject(result.issues);
     const nextReviews = reconcileReviewRecords(result.rows, groups.map((group) => group.reviewKey), reviewRecords, now);
     saveReviewRecords(nextReviews, window.localStorage);
     setAnalysis(result);
+    setImportReady(payload);
     setReviewRecords(nextReviews);
     setReport(createReviewReport(result, nextReviews, now));
     setCategory('全部');
     setReviewStatusFilter('全部');
+  }
+
+  function clearImportedAnalysis() {
+    setImportReady(null);
+    setAnalysis(null);
+    setReport('');
   }
 
   function changeReview(projectId: string, patch: { status?: ReviewStatus; note?: string }) {
@@ -94,21 +106,20 @@ export default function App() {
   return <div className="app-shell">
     <aside className="sidebar">
       <div className="brand"><div className="brand-mark">CR</div><div><strong>CRM 项目运营复盘</strong><span>储备项目分析助手</span></div></div>
-      <div className="side-section"><p className="side-label">导入标准 Excel</p><label className="upload-button"><Upload size={16} /> 选择 .xlsx 文件<input type="file" accept=".xlsx" onChange={(event) => onFileChange(event.target.files?.[0] ?? null)} /></label>
-        {fileName && <div className="file-state"><FileSpreadsheet size={17} /><div><b>{fileName}</b><span>{parsed?.rows.length ?? 0} 条项目记录</span></div></div>}
+      <div className="side-section"><p className="side-label">导入 Excel</p><label className="upload-button"><Upload size={16} /> 选择 .xlsx 文件<input aria-label="选择 .xlsx 文件" type="file" accept=".xlsx" onChange={(event) => onFileChange(event.target.files?.[0] ?? null)} /></label>
+        {fileName && <div className="file-state"><FileSpreadsheet size={17} /><div><b>{fileName}</b><span>{importReady?.rows.length ?? '待确认'} 条项目记录</span></div></div>}
         {error && <p className="error">{error}</p>}
       </div>
-      {inspection && <div className="side-section"><p className="side-label">工作表</p><select value={sheetName} onChange={(event) => { setSheetName(event.target.value); setAnalysis(null); setReport(''); }}>{inspection.sheetNames.map((name) => <option key={name}>{name}</option>)}</select>
+      {inspection && <div className="side-section"><p className="side-label">工作表</p><select aria-label="工作表" value={sheetName} onChange={(event) => { setSheetName(event.target.value); setImportReady(null); setAnalysis(null); setReport(''); }}>{inspection.sheetNames.map((name) => <option key={name}>{name}</option>)}</select>
         <p className="side-label threshold-title">规则阈值</p>
         {isCrmHistory ? <><Threshold label="跟进停滞天数" value={30} suffix="天" onChange={() => undefined} disabled /><Threshold label="金额复核上限" value={thresholds.absoluteAmountLimitWan} suffix="万元" onChange={(value) => setThresholds({ ...thresholds, absoluteAmountLimitWan: value })} /><p className="rule-note">呆滞由销售手动标记；低概率项目仅进入观察清单，不计入风险。</p></> : <><Threshold label="跟进停滞天数" value={thresholds.followUpDays} suffix="天" onChange={(value) => setThresholds({ ...thresholds, followUpDays: value })} /><Threshold label="长期储备天数" value={thresholds.longReserveDays} suffix="天" onChange={(value) => setThresholds({ ...thresholds, longReserveDays: value })} /><Threshold label="金额复核上限" value={thresholds.absoluteAmountLimitWan} suffix="万元" onChange={(value) => setThresholds({ ...thresholds, absoluteAmountLimitWan: value })} /></>}
       </div>}
       <div className="sidebar-note"><ShieldCheck size={16} /><span>文件仅在当前浏览器中读取和分析，不会上传原始 Excel。</span></div>
     </aside>
     <main className="content">
-      <header><div><h1>储备项目运营复盘助手</h1><p>以固定规则发现数据质量问题和经营风险，最终结论由业务人员确认。</p></div>{parsed?.validation.valid && <button className="primary" onClick={startAnalysis}>开始分析</button>}</header>
-      {!inspection && <section className="empty import-guide"><FileSpreadsheet size={36} /><h2>上传 CRM 储备项目表</h2><p>支持未加密的 .xlsx 文件。请使用同一工作表中的固定字段，系统不会自动猜测字段含义。</p><a className="sample-download" href="/CRM历史项目表-脱敏适配样表.xlsx" download><Download size={15} /> 下载脱敏示例表</a><div className="field-guide"><div><h3>必须完整存在的表头</h3><div className="field-tags">{CRM_HISTORY_HEADERS.map((header) => <span key={header}>{header}</span>)}</div></div><div className="field-notes"><p><b>项目状态：</b>跟进中、呆滞</p><p><b>成单概率：</b>询价类、1%-50%、51%-70%、71%-80%、81%-100%</p><p><b>金额单位：</b>储备金额直接填写万元；项目编码或名称为“无”会提示复核。</p></div></div></section>}
-      {parsed && !parsed.validation.valid && <section className="notice"><h2>无法开始分析</h2><p>缺少必填字段：{parsed.validation.missing.join('、')}</p><p>请选择包含标准项目明细表的工作表，或修正 Excel 表头后重新上传。</p></section>}
-      {parsed?.validation.valid && !analysis && <section className="ready"><h2>文件校验通过</h2><p>已找到 {parsed.rows.length} 条项目记录。确认阈值后点击“开始分析”。</p><Preview rows={parsed.preview} /></section>}
+      <header><div><h1>储备项目运营复盘助手</h1><p>以固定规则发现数据质量问题和经营风险，最终结论由业务人员确认。</p></div></header>
+      {!inspection && <section className="empty import-guide"><FileSpreadsheet size={36} /><h2>上传 CRM 储备项目表</h2><p>支持未加密的 .xlsx 文件，可在导入向导中确认表头、字段关系和业务口径。</p><a className="sample-download" href="/CRM历史项目表-脱敏适配样表.xlsx" download><Download size={15} /> 下载脱敏示例表</a></section>}
+      {sheetInspection && <ImportWizard key={`${fileName}:${sheetName}`} inspection={sheetInspection} onReady={startAnalysis} onConfigurationChange={clearImportedAnalysis} />}
       {analysis && <>
         <section className="metrics">
           <Metric label="项目总数" value={analysis.overview.projectCount} sub="本次导入" />
@@ -151,7 +162,3 @@ function IssueTable({ groups, reviews, onChangeReview }: { groups: ProjectIssueG
 function ProjectList({ title, description, rows, empty }: { title: string; description: string; rows: AnalysisResult['rows']; empty: string }) {
   return <section className="project-list"><div><h2>{title}</h2><p>{description}</p></div>{rows.length === 0 ? <p className="no-issues">{empty}</p> : <ol>{rows.map((row) => <li key={row.sourceKey ?? row.projectId}><div><b>{row.projectName || '未填写项目名称'}</b><span>{row.projectId || '未填写项目编号'} · {row.salesManager || '未填写负责人'}</span></div><strong>{row.amount === null ? '—' : `${formatAmount(row.amount)} 万`}</strong></li>)}</ol>}</section>;
 }
-
-function Preview({ rows }: { rows: Array<Record<string, unknown>> }) { const columns = ['项目编号', '项目名称', '部门', '销售经理', '项目状态']; return <div className="preview"><p>前 5 行预览</p><table><thead><tr>{columns.map((column) => <th key={column}>{column}</th>)}</tr></thead><tbody>{rows.map((row, index) => <tr key={index}>{columns.map((column) => <td key={column}>{String(row[column] ?? '—')}</td>)}</tr>)}</tbody></table></div>; }
-
-const CRM_HISTORY_HEADERS = ['部门', '销售经理', '创建日期', '最近拜访时间', '拜访间隔周期（天）', '项目名称', '项目编码', '项目状态', '成单概率', '储备金额（万元）', '预计合同签订时间'];

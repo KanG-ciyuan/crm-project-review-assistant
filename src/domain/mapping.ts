@@ -273,6 +273,7 @@ export function applyMappings(
   values: ValueMappings,
   sheetName: string
 ): ProjectRow[] {
+  const mapsUnitColumn = mappings.some((mapping) => mapping.mode === 'standard' && mapping.targetField === 'unit');
   const rows = records.map((record) => {
     const row = emptyProject();
     for (const mapping of mappings) {
@@ -283,7 +284,7 @@ export function applyMappings(
         row.customFields[mapping.customName.trim()] = toCustomValue(value);
       }
     }
-    if (!row.unit) row.unit = toUnit(values.amountUnit);
+    if (!row.unit && !mapsUnitColumn) row.unit = toUnit(values.amountUnit);
     return row;
   });
 

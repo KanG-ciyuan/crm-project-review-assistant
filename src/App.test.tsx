@@ -1,11 +1,16 @@
 import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, expect, it, vi } from 'vitest';
+import * as XLSX from 'xlsx';
 import App from './App';
 import { loadReviewRecords, reconcileReviewRecords, saveReviewRecords, updateReviewRecord } from './domain/review';
+import * as workbookApi from './lib/workbook';
 import { makeProject } from './test/fixtures';
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+});
 
 it('retains a user-selected review status after a page-style storage reload', () => {
   const values = new Map<string, string>();
@@ -52,4 +57,48 @@ it('copies the feedback email address from the footer', async () => {
 
   expect(writeText).toHaveBeenCalledWith('88416563@qq.com');
   expect(await screen.findByRole('button', { name: '已复制' })).toBeInTheDocument();
+});
+
+it('opens the guided mapper for an arbitrary worksheet instead of requiring fixed headers', async () => {
+  const user = userEvent.setup();
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([
+    ['商机标题', '负责人姓名', '内部阶段'],
+    ['医院数字化', '销售甲', '方案沟通']
+  ]), '自定义商机表');
+  vi.spyOn(workbookApi, 'inspectWorkbook').mockResolvedValue({
+    workbook,
+    sheetNames: ['自定义商机表']
+  });
+
+  render(<App />);
+  await user.upload(screen.getByLabelText('选择 .xlsx 文件'), new File(['content'], '客户商机.xlsx'));
+
+  expect(await screen.findByRole('heading', { name: '确认表头行' })).toBeInTheDocument();
+  expect(screen.getByRole('option', { name: '自定义商机表' })).toBeInTheDocument();
+  expect(screen.queryByText('缺少必填字段')).not.toBeInTheDocument();
+});
+
+it('clears an existing analysis when the confirmed mapping is edited', async () => {
+  const user = userEvent.setup();
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([
+    ['项目名称'],
+    ['医院数字化']
+  ]), '商机表');
+  vi.spyOn(workbookApi, 'inspectWorkbook').mockResolvedValue({ workbook, sheetNames: ['商机表'] });
+
+  render(<App />);
+  await user.upload(screen.getByLabelText('选择 .xlsx 文件'), new File(['content'], '商机.xlsx'));
+  await user.click(await screen.findByRole('button', { name: '确认表头行' }));
+  await user.click(screen.getByRole('button', { name: '确认字段关系' }));
+  await user.click(screen.getByRole('button', { name: '确认状态口径' }));
+  await user.click(screen.getByRole('button', { name: '开始规则分析' }));
+  expect(screen.getByRole('heading', { name: '数据质量与经营风险' })).toBeInTheDocument();
+
+  await user.click(screen.getByRole('button', { name: '返回' }));
+  await user.click(screen.getByRole('button', { name: '返回' }));
+  await user.selectOptions(screen.getByLabelText('项目名称处理方式'), 'custom');
+
+  expect(screen.queryByRole('heading', { name: '数据质量与经营风险' })).not.toBeInTheDocument();
 });

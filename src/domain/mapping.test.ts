@@ -122,6 +122,20 @@ describe('field mappings', () => {
     expect(amountInWan(row)).toBeNull();
   });
 
+  it('does not fill blank row units when a source unit column is mapped', () => {
+    const rows = applyMappings(
+      [{ 金额: 1200, 单位: '万元' }, { 金额: 300, 单位: '' }],
+      [
+        { sourceHeader: '金额', mode: 'standard', targetField: 'amount' },
+        { sourceHeader: '单位', mode: 'standard', targetField: 'unit' }
+      ],
+      { statuses: {}, probabilities: {}, amountUnit: '万元' },
+      '商机明细'
+    );
+
+    expect(rows.map((row) => row.unit)).toEqual(['万元', '']);
+  });
+
   it('keeps a unique project ID stable when row order changes or the file is imported again', () => {
     const mappings: ColumnMapping[] = [
       { sourceHeader: '编号', mode: 'standard', targetField: 'projectId' },
