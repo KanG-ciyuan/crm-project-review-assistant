@@ -174,6 +174,7 @@ const toStatus = (value: unknown, values: ValueMappings): ProjectStatus => {
 
 const toProbability = (value: unknown, values: ValueMappings): ProbabilityBand => {
   const source = toText(value);
+  if (!source) return '未知';
   const mapped = mappedValue(source, values.probabilities);
   if (mapped) return mapped;
   if (validProbabilities.has(source as ProbabilityBand)) return source as ProbabilityBand;
@@ -182,7 +183,7 @@ const toProbability = (value: unknown, values: ValueMappings): ProbabilityBand =
   if (source === '71%-80%' || source === '71-80%') return '较高概率';
   if (source === '81%-100%' || source === '81-100%') return '临近签约';
   const numeric = Number(source.replace('%', ''));
-  if (!Number.isFinite(numeric)) return '未知';
+  if (!Number.isFinite(numeric) || numeric < 0) return '未知';
   const percent = numeric > 0 && numeric <= 1 ? numeric * 100 : numeric;
   if (percent <= 50) return '低概率';
   if (percent <= 70) return '中等概率';
@@ -247,7 +248,7 @@ function assignStandardField(
   }
 }
 
-const sourceNamespace = (sheetName: string) => encodeURIComponent(normalizeAlias(sheetName) || 'sheet');
+const sourceNamespace = (sheetName: string) => encodeURIComponent(fullWidthToHalfWidth(sheetName).trim() || 'sheet');
 const sourceIdentity = (projectId: string) => encodeURIComponent(fullWidthToHalfWidth(projectId).trim().toLocaleLowerCase());
 
 /**
@@ -289,4 +290,3 @@ export function applyMappings(
   });
   return rows;
 }
-

@@ -145,4 +145,26 @@ describe('field mappings', () => {
 
     expect(east[0].sourceKey).not.toBe(west[0].sourceKey);
   });
+
+  it('does not collapse spaces or punctuation that distinguish valid sheet names', () => {
+    const mappings: ColumnMapping[] = [{ sourceHeader: '编号', mode: 'standard', targetField: 'projectId' }];
+    const spaced = applyMappings([{ 编号: 'A-1' }], mappings, emptyValueMappings, '华东 商机');
+    const hyphenated = applyMappings([{ 编号: 'A-1' }], mappings, emptyValueMappings, '华东-商机');
+
+    expect(spaced[0].sourceKey).not.toBe(hyphenated[0].sourceKey);
+  });
+
+  it('keeps blank and negative probability values unknown', () => {
+    const mappings: ColumnMapping[] = [
+      { sourceHeader: '概率', mode: 'standard', targetField: 'probabilityBand' }
+    ];
+    const rows = applyMappings(
+      [{ 概率: '' }, { 概率: '   ' }, { 概率: -1 }],
+      mappings,
+      emptyValueMappings,
+      '商机明细'
+    );
+
+    expect(rows.map((row) => row.probabilityBand)).toEqual(['未知', '未知', '未知']);
+  });
 });
