@@ -8,6 +8,7 @@ import {
   type ValueMappings
 } from '../domain/mapping';
 import { readSheetRecords, type RawSheetInspection } from '../lib/workbook';
+import { getRuleCapabilities } from '../domain/rules';
 import '../mapping.css';
 
 export interface ImportReadyPayload {
@@ -71,7 +72,7 @@ const suggestedUnit = (source: string): '' | '元' | '万元' | '亿元' => {
   return '';
 };
 
-export function ImportWizard({ inspection, onReady, capabilities = [], onConfigurationChange }: ImportWizardProps) {
+export function ImportWizard({ inspection, onReady, capabilities, onConfigurationChange }: ImportWizardProps) {
   const defaultHeader = inspection.candidateHeaderRows[0] ?? 0;
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
   const [headerRowIndex, setHeaderRowIndex] = useState(defaultHeader);
@@ -154,6 +155,13 @@ export function ImportWizard({ inspection, onReady, capabilities = [], onConfigu
     () => step === 4 ? applyMappings(records, mappings, valueMappings, inspection.sheetName) : [],
     [amountUnit, inspection.sheetName, mappings, probabilities, records, statuses, step]
   );
+  const mappedStandardFields = useMemo(
+    () => new Set(mappings
+      .filter((mapping): mapping is ColumnMapping & { targetField: CanonicalFieldKey } => mapping.mode === 'standard' && Boolean(mapping.targetField))
+      .map((mapping) => mapping.targetField)),
+    [mappings]
+  );
+  const ruleCapabilities = capabilities ?? getRuleCapabilities(mappedStandardFields);
 
   function finish() {
     onReady({
@@ -222,7 +230,7 @@ export function ImportWizard({ inspection, onReady, capabilities = [], onConfigu
     {step === 4 && <div className="wizard-panel">
       <div className="wizard-heading"><div><p>第 4 步</p><h2>确认分析范围</h2></div><span>{canonicalRows.length} 条记录</span></div>
       <div className="confirmation-grid"><article><span>标准字段</span><strong>{mappings.filter((mapping) => mapping.mode === 'standard').length}</strong></article><article><span>自定义字段</span><strong>{mappings.filter((mapping) => mapping.mode === 'custom').length}</strong></article><article><span>忽略字段</span><strong>{mappings.filter((mapping) => mapping.mode === 'ignore').length}</strong></article></div>
-      <section className="capability-preview"><h3>可执行规则</h3>{capabilities.length === 0 ? <p>待后续规则包加载</p> : <ul>{capabilities.map((capability) => <li key={capability.ruleId}><b>{capability.name ?? capability.ruleId}</b><span>{capability.available ? '可执行' : `跳过：缺少${capability.missingFields.map((field) => FIELD_LABELS[field]).join('、')}`}</span></li>)}</ul>}</section>
+      <section className="capability-preview"><h3>规则执行范围</h3><ul>{ruleCapabilities.map((capability) => <li key={capability.ruleId}><b>{capability.name ?? capability.ruleId}</b><span>{capability.available ? '可执行' : `跳过：缺少${capability.missingFields.map((field) => FIELD_LABELS[field]).join('、')}`}</span></li>)}</ul></section>
       <p className="wizard-help">点击后将按已确认的字段关系和统一口径直接运行规则分析。</p>
       <div className="wizard-actions"><button className="secondary" type="button" onClick={() => returnTo(3)}>返回</button><button className="primary" type="button" onClick={finish}>开始规则分析</button></div>
     </div>}

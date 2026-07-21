@@ -112,8 +112,8 @@ describe('ImportWizard', () => {
     await user.click(screen.getByRole('button', { name: '确认状态口径' }));
 
     expect(screen.getByRole('heading', { name: '确认分析范围' })).toBeInTheDocument();
-    expect(screen.getByText('可执行规则')).toBeInTheDocument();
-    expect(screen.getByText('待后续规则包加载')).toBeInTheDocument();
+    expect(screen.getByText('规则执行范围')).toBeInTheDocument();
+    expect(screen.getByText('重点项目金额分档')).toBeInTheDocument();
     expect(onReady).not.toHaveBeenCalled();
 
     await user.click(screen.getByRole('button', { name: '开始规则分析' }));
@@ -123,6 +123,21 @@ describe('ImportWizard', () => {
       rows: [expect.objectContaining({ projectId: 'A-1', status: '跟进中', amount: 1200, unit: '万元' })],
       source: { sheetName: '商机明细', headerRowIndex: 0 }
     }));
+  });
+
+  it('shows skipped rules with clear missing field labels', async () => {
+    const user = userEvent.setup();
+    render(<ImportWizard inspection={inspection([
+      ['项目名称', '项目状态', '创建日期'],
+      ['医院数改', '跟进中', '2026-01-01']
+    ])} onReady={vi.fn()} />);
+
+    await confirmHeaderAndFields(user);
+    await user.click(screen.getByRole('button', { name: '确认状态口径' }));
+
+    const signingRule = screen.getByText('签约日期超期未更新').closest('li');
+    expect(signingRule).not.toBeNull();
+    expect(within(signingRule!).getByText('跳过：缺少预计签约日期')).toBeInTheDocument();
   });
 
   it('invalidates the previous analysis from every return button', async () => {

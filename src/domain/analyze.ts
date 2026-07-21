@@ -1,6 +1,7 @@
 import { amountInWan, daysBetween, parseIsoDate, projectKey, type ProjectRow } from './project';
 
 export type { ProjectRow, ProjectStatus, ProbabilityBand } from './project';
+export * from './rules';
 
 export interface Thresholds {
   followUpDays: number;
