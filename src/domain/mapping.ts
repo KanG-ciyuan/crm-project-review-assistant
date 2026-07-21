@@ -25,6 +25,7 @@ export interface ValueMappings {
 export interface MappingValidation {
   valid: boolean;
   duplicateTargets: CanonicalFieldKey[];
+  duplicateCustomNames: string[];
   unmappedEnumValues: string[];
   invalidMappings: string[];
 }
@@ -84,6 +85,7 @@ const validUnits = new Set(['元', '万元', '亿元']);
 
 export function validateMappings(mappings: ColumnMapping[], values: ValueMappings): MappingValidation {
   const targetCounts = new Map<CanonicalFieldKey, number>();
+  const customNameCounts = new Map<string, number>();
   const invalidMappings: string[] = [];
 
   for (const mapping of mappings) {
@@ -94,14 +96,22 @@ export function validateMappings(mappings: ColumnMapping[], values: ValueMapping
         targetCounts.set(mapping.targetField, (targetCounts.get(mapping.targetField) ?? 0) + 1);
       }
     }
-    if (mapping.mode === 'custom' && !mapping.customName?.trim()) {
-      invalidMappings.push(`${mapping.sourceHeader}缺少自定义字段名称`);
+    if (mapping.mode === 'custom') {
+      const customName = mapping.customName?.trim() ?? '';
+      if (!customName) {
+        invalidMappings.push(`${mapping.sourceHeader}缺少自定义字段名称`);
+      } else {
+        customNameCounts.set(customName, (customNameCounts.get(customName) ?? 0) + 1);
+      }
     }
   }
 
   const duplicateTargets = [...targetCounts.entries()]
     .filter(([, count]) => count > 1)
     .map(([field]) => field);
+  const duplicateCustomNames = [...customNameCounts.entries()]
+    .filter(([, count]) => count > 1)
+    .map(([name]) => name);
   const unmappedEnumValues: string[] = [];
   const mapsAmount = targetCounts.has('amount');
   const mapsUnitColumn = targetCounts.has('unit');
@@ -116,8 +126,9 @@ export function validateMappings(mappings: ColumnMapping[], values: ValueMapping
   }
 
   return {
-    valid: duplicateTargets.length === 0 && unmappedEnumValues.length === 0 && invalidMappings.length === 0,
+    valid: duplicateTargets.length === 0 && duplicateCustomNames.length === 0 && unmappedEnumValues.length === 0 && invalidMappings.length === 0,
     duplicateTargets,
+    duplicateCustomNames,
     unmappedEnumValues,
     invalidMappings
   };

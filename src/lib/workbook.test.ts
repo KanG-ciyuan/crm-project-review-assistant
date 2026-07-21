@@ -27,6 +27,28 @@ describe('workbook helpers', () => {
     expect(records[0]).toEqual({ 项目名称: '医院数改', 未命名列2: '临时值', 备注: '首次', '备注 (2)': '再次' });
   });
 
+  it('keeps generated headers globally unique when source names already contain suffixes', () => {
+    const [record] = readSheetRecords([
+      ['备注', '备注', '备注 (2)'],
+      ['首次', '再次', '已有后缀']
+    ], 0);
+
+    expect(Object.keys(record)).toHaveLength(3);
+    expect(new Set(Object.keys(record)).size).toBe(3);
+    expect(Object.values(record)).toEqual(['首次', '再次', '已有后缀']);
+  });
+
+  it('does not let an automatic blank-header name overwrite a real source header', () => {
+    const [record] = readSheetRecords([
+      ['未命名列2', ''],
+      ['真实表头值', '空表头值']
+    ], 0);
+
+    expect(Object.keys(record)).toHaveLength(2);
+    expect(new Set(Object.keys(record)).size).toBe(2);
+    expect(Object.values(record)).toEqual(['真实表头值', '空表头值']);
+  });
+
   it('reads the legacy CRM history sample without fixed-profile parsing', () => {
     const workbook = XLSX.readFile('sample-data/CRM历史项目表-脱敏适配样表.xlsx', { cellDates: true });
     const inspected = inspectSheet(workbook, '10-储备项目报备表（跟进中和呆滞）');

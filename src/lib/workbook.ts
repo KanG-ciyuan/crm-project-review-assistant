@@ -108,12 +108,19 @@ export function inspectSheet(workbook: XLSX.WorkBook, sheetName: string): RawShe
 }
 
 function uniqueHeaders(row: unknown[]): string[] {
-  const counts = new Map<string, number>();
+  const usedHeaders = new Set<string>();
+  const nextSuffixes = new Map<string, number>();
   return row.map((cell, index) => {
     const base = String(cell ?? '').trim() || `未命名列${index + 1}`;
-    const count = (counts.get(base) ?? 0) + 1;
-    counts.set(base, count);
-    return count === 1 ? base : `${base} (${count})`;
+    let header = base;
+    let suffix = nextSuffixes.get(base) ?? 2;
+    while (usedHeaders.has(header)) {
+      header = `${base} (${suffix})`;
+      suffix += 1;
+    }
+    nextSuffixes.set(base, suffix);
+    usedHeaders.add(header);
+    return header;
   });
 }
 

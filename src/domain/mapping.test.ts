@@ -58,6 +58,18 @@ describe('field mappings', () => {
     expect(validation).toMatchObject({ valid: false, duplicateTargets: ['projectName'] });
   });
 
+  it('rejects custom field names that collide after trimming', () => {
+    const validation = validateMappings([
+      { sourceHeader: '来源渠道', mode: 'custom', customName: '项目来源' },
+      { sourceHeader: '获客方式', mode: 'custom', customName: ' 项目来源 ' }
+    ], emptyValueMappings);
+
+    expect(validation).toMatchObject({
+      valid: false,
+      duplicateCustomNames: ['项目来源']
+    });
+  });
+
   it('normalizes mapped dates, amounts, statuses, probabilities, and import units', () => {
     const rows = applyMappings(
       [{ 编号: 'A-1', 金额: '1,200', 创建: '2026/01/02', 状态: '推进中', 概率: '51%-70%' }],
