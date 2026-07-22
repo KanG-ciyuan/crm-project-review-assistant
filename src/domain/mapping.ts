@@ -279,19 +279,22 @@ function assignStandardField(
   }
 }
 
-const sourceNamespace = (sheetName: string) => encodeURIComponent(fullWidthToHalfWidth(sheetName).trim() || 'sheet');
+const legacySheetNamespace = (sheetName: string) => encodeURIComponent(fullWidthToHalfWidth(sheetName).trim() || 'sheet');
+const encodedSourceSegment = (value: string, fallback: string) => encodeURIComponent(value || fallback);
 const sourceIdentity = (projectId: string) => encodeURIComponent(fullWidthToHalfWidth(projectId).trim().toLocaleLowerCase());
 
 /**
- * A sheet is the source namespace. Unique project IDs remain stable across row
- * moves and re-imports; missing or duplicated IDs receive a row suffix so no
- * source record can overwrite another record in review state.
+ * A supplied workbook namespace plus the sheet name scopes source identity.
+ * Unique project IDs remain stable across row moves and re-imports; missing or
+ * duplicated IDs receive a row suffix so no record can overwrite another.
+ * Omitting sourceNamespace preserves the legacy sheet-scoped key format.
  */
 export function applyMappings(
   records: Array<Record<string, unknown>>,
   mappings: ColumnMapping[],
   values: ValueMappings,
-  sheetName: string
+  sheetName: string,
+  sourceNamespace?: string
 ): ProjectRow[] {
   const mapsUnitColumn = mappings.some((mapping) => mapping.mode === 'standard' && mapping.targetField === 'unit');
   const rows = records.map((record) => {
@@ -313,12 +316,14 @@ export function applyMappings(
     const identity = sourceIdentity(row.projectId);
     if (identity) idCounts.set(identity, (idCounts.get(identity) ?? 0) + 1);
   }
-  const namespace = sourceNamespace(sheetName);
+  const namespace = sourceNamespace === undefined
+    ? `sheet:${legacySheetNamespace(sheetName)}`
+    : `source:${encodedSourceSegment(sourceNamespace, 'workbook')}:sheet:${encodedSourceSegment(sheetName, 'sheet')}`;
   rows.forEach((row, index) => {
     const identity = sourceIdentity(row.projectId);
     row.sourceKey = identity && idCounts.get(identity) === 1
-      ? `sheet:${namespace}:id:${identity}`
-      : `sheet:${namespace}:${identity ? `id:${identity}:` : ''}row:${index + 1}`;
+      ? `${namespace}:id:${identity}`
+      : `${namespace}:${identity ? `id:${identity}:` : ''}row:${index + 1}`;
   });
   return rows;
 }

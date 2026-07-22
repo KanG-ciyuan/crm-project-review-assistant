@@ -194,7 +194,7 @@ describe('field mappings', () => {
       { 编号: '', 项目: '无编号二' },
       { 编号: 'DUP-1', 项目: '重复一' },
       { 编号: 'DUP-1', 项目: '重复二' }
-    ], mappings, emptyValueMappings, '商机明细');
+    ], mappings, emptyValueMappings, '商机明细', '客户甲台账.xlsx');
 
     expect(new Set(rows.map((row) => row.sourceKey)).size).toBe(4);
     expect(rows[0].sourceKey).not.toBe(rows[1].sourceKey);
@@ -215,6 +215,18 @@ describe('field mappings', () => {
     const hyphenated = applyMappings([{ 编号: 'A-1' }], mappings, emptyValueMappings, '华东-商机');
 
     expect(spaced[0].sourceKey).not.toBe(hyphenated[0].sourceKey);
+  });
+
+  it('isolates the same sheet and project ID across workbook source namespaces', () => {
+    const mappings: ColumnMapping[] = [{ sourceHeader: '编号', mode: 'standard', targetField: 'projectId' }];
+    const first = applyMappings([{ 编号: 'A-1' }, { 编号: 'B-2' }], mappings, emptyValueMappings, '商机明细', '客户甲 台账.xlsx');
+    const repeated = applyMappings([{ 编号: 'B-2' }, { 编号: 'A-1' }], mappings, emptyValueMappings, '商机明细', '客户甲 台账.xlsx');
+    const second = applyMappings([{ 编号: 'A-1' }], mappings, emptyValueMappings, '商机明细', '客户乙-台账.xlsx');
+
+    expect(first[0].sourceKey).toBe(repeated[1].sourceKey);
+    expect(first[0].sourceKey).not.toBe(second[0].sourceKey);
+    expect(first[0].sourceKey).toContain(encodeURIComponent('客户甲 台账.xlsx'));
+    expect(first[0].sourceKey).toContain(encodeURIComponent('商机明细'));
   });
 
   it('keeps blank and negative probability values unknown', () => {

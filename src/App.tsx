@@ -152,7 +152,7 @@ export default function App() {
     <main className="content">
       <header><div><h1>储备项目运营复盘助手</h1><p>以固定规则发现数据质量问题和经营风险，最终结论由业务人员确认。</p></div></header>
       {!inspection && <section className="empty import-guide"><FileSpreadsheet size={36} /><h2>上传 CRM 储备项目表</h2><p>支持未加密的 .xlsx 文件，可在导入向导中确认表头、字段关系和业务口径。</p><a className="sample-download" href="/CRM历史项目表-脱敏适配样表.xlsx" download><Download size={15} /> 下载脱敏示例表</a></section>}
-      {sheetInspection && <ImportWizard key={`${importRevision}:${fileName}:${sheetName}`} inspection={sheetInspection} onReady={startAnalysis} onConfigurationChange={clearImportedAnalysis} />}
+      {sheetInspection && <ImportWizard key={`${importRevision}:${fileName}:${sheetName}`} inspection={sheetInspection} sourceNamespace={fileName} onReady={startAnalysis} onConfigurationChange={clearImportedAnalysis} />}
       {analysis && visibleAnalysis && <>
         <AnalysisFilters analysis={analysis} filters={filters} reviews={reviewRecords} selectedCount={selectedKeys.size} totalCount={analysis.rows.length} onChange={setFilters} />
         <AnalysisResults analysis={visibleAnalysis} reviews={reviewRecords} onChangeReview={changeReview} />

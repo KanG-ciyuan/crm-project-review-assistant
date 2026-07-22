@@ -111,4 +111,15 @@ describe('review records', () => {
 
     expect(next['standard:1']).toEqual(prior['standard:1']);
   });
+
+  it('keeps a prior workbook decision without applying it to a different workbook source', () => {
+    const first = { ...row, sourceKey: 'source:file-a:sheet:projects:id:p-1' };
+    const second = { ...row, sourceKey: 'source:file-b:sheet:projects:id:p-1' };
+    const firstRecords = reconcileReviewRecords([first], [first.sourceKey], {}, new Date('2026-07-17T09:00:00Z'));
+    const reviewed = updateReviewRecord(firstRecords, first.sourceKey, { status: '已忽略', note: '文件 A 已确认。' }, new Date('2026-07-17T10:00:00Z'));
+    const next = reconcileReviewRecords([second], [second.sourceKey], reviewed, new Date('2026-07-18T09:00:00Z'));
+
+    expect(next[first.sourceKey]).toMatchObject({ status: '已忽略', note: '文件 A 已确认。' });
+    expect(next[second.sourceKey]).toMatchObject({ status: '待复核', note: '' });
+  });
 });

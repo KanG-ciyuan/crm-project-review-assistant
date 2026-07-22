@@ -7,7 +7,7 @@ import {
   normalizeProjectName
 } from './rules';
 
-const today = new Date('2026-07-21');
+const today = new Date(2026, 6, 21, 12);
 
 describe('confirmed To B rule pack', () => {
   it('flags both active and dormant projects after 30 days without follow-up', () => {

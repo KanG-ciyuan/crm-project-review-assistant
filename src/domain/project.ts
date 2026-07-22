@@ -52,5 +52,8 @@ export function parseIsoDate(value: string | null): Date | null {
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
+const calendarDayNumber = (date: Date) =>
+  Date.UTC(date.getFullYear(), date.getMonth(), date.getDate());
+
 export const daysBetween = (earlier: Date, later: Date) =>
-  Math.floor((later.getTime() - earlier.getTime()) / 86_400_000);
+  Math.floor((calendarDayNumber(later) - calendarDayNumber(earlier)) / 86_400_000);

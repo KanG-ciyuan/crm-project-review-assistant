@@ -5,7 +5,7 @@ import { evaluateRulePack, type Finding } from './rules';
 
 describe('analysis summaries', () => {
   it('keeps five result categories separate and recalculates summaries for selected rows', () => {
-    const today = new Date('2026-07-21');
+    const today = new Date(2026, 6, 21, 12);
     const rows = [
       makeProject({ sourceKey: 'row-a', amount: 1200, department: '华东一部' }),
       makeProject({ sourceKey: 'row-b', projectId: 'CRM-002', amount: 300, department: '华南部' }),
@@ -25,7 +25,7 @@ describe('analysis summaries', () => {
   });
 
   it('builds department, seller, follow-up, reserve, probability, and amount summaries', () => {
-    const today = new Date('2026-07-21');
+    const today = new Date(2026, 6, 21, 12);
     const rows = [
       makeProject({ sourceKey: 'a', department: '华东部', salesManager: '销售甲', amount: 1000, lastFollowUpAt: '2026-07-20', createdAt: '2026-07-01', probabilityBand: '中等概率' }),
       makeProject({ sourceKey: 'b', projectId: 'B', department: '华东部', salesManager: '销售乙', amount: 5000, lastFollowUpAt: '2026-05-01', createdAt: '2025-01-01', probabilityBand: '低概率' })
@@ -46,7 +46,7 @@ describe('analysis summaries', () => {
       makeProject({ sourceKey: 'invalid', amount: 8, unit: '美元', lastFollowUpAt: 'not-a-date', createdAt: '2026-13-40' }),
       makeProject({ sourceKey: 'valid', amount: 1, unit: '亿元', lastFollowUpAt: '2026-07-21', createdAt: '2026-07-21' })
     ];
-    const analysis = buildAnalysis(rows, [], new Date('2026-07-21'));
+    const analysis = buildAnalysis(rows, [], new Date(2026, 6, 21, 12));
 
     expect(analysis.overview.totalAmountWan).toBe(10000);
     expect(analysis.followUpBuckets.reduce((sum, item) => sum + item.projectCount, 0)).toBe(1);
@@ -59,7 +59,7 @@ describe('analysis summaries', () => {
       ruleId: 'synthetic', rowKey: 'kept', projectId: '', projectName: '测试', customerName: '', department: '', salesManager: '', amountWan: 10,
       category: '经营结构分析', label: '仅存在于输入的标签', reason: '用于证明投影不会重新评估', level: 'info'
     };
-    const selected = projectAnalysis(buildAnalysis(rows, [synthetic], new Date('2026-07-21')), new Set(['kept']));
+    const selected = projectAnalysis(buildAnalysis(rows, [synthetic], new Date(2026, 6, 21, 12)), new Set(['kept']));
 
     expect(selected.findings).toEqual([synthetic]);
     expect(selected.results['经营结构分析']).toEqual([synthetic]);

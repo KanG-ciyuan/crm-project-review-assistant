@@ -12,7 +12,7 @@ import { evaluateRulePack, type Finding } from './rules';
 import type { ReviewRecordMap } from './review';
 import { makeProject } from '../test/fixtures';
 
-const today = new Date('2026-07-21T09:00:00+08:00');
+const today = new Date(2026, 6, 21, 12);
 
 describe('global analysis filters', () => {
   it('uses OR within a dimension and AND across dimensions', () => {

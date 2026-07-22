@@ -27,6 +27,7 @@ export interface RuleCapabilityPreview {
 
 export interface ImportWizardProps {
   inspection: RawSheetInspection;
+  sourceNamespace?: string;
   onReady: (payload: ImportReadyPayload) => void;
   capabilities?: RuleCapabilityPreview[];
   onConfigurationChange?: () => void;
@@ -72,7 +73,7 @@ const suggestedUnit = (source: string): '' | '元' | '万元' | '亿元' => {
   return '';
 };
 
-export function ImportWizard({ inspection, onReady, capabilities, onConfigurationChange }: ImportWizardProps) {
+export function ImportWizard({ inspection, sourceNamespace, onReady, capabilities, onConfigurationChange }: ImportWizardProps) {
   const defaultHeader = inspection.candidateHeaderRows[0] ?? 0;
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
   const [headerRowIndex, setHeaderRowIndex] = useState(defaultHeader);
@@ -152,8 +153,8 @@ export function ImportWizard({ inspection, onReady, capabilities, onConfiguratio
     amountUnit
   };
   const canonicalRows = useMemo(
-    () => step === 4 ? applyMappings(records, mappings, valueMappings, inspection.sheetName) : [],
-    [amountUnit, inspection.sheetName, mappings, probabilities, records, statuses, step]
+    () => step === 4 ? applyMappings(records, mappings, valueMappings, inspection.sheetName, sourceNamespace) : [],
+    [amountUnit, inspection.sheetName, mappings, probabilities, records, sourceNamespace, statuses, step]
   );
   const mappedStandardFields = useMemo(() => {
     const fields = new Set(mappings
