@@ -116,6 +116,30 @@ describe('confirmed To B rule pack', () => {
     expect(labelsFor('collision-a')).not.toEqual(expect.arrayContaining(['重复记录待核实', '疑似重复立项']));
   });
 
+  it('evaluates duplicate creation and cross-seller collision within the same mixed group', () => {
+    const rows = [
+      makeProject({ sourceKey: 'mixed-a', projectId: 'A', customerName: '混合客户', projectName: '同名项目', salesManager: '销售甲' }),
+      makeProject({ sourceKey: 'mixed-b', projectId: 'B', customerName: '混合客户', projectName: '同名项目', salesManager: '销售甲' }),
+      makeProject({ sourceKey: 'mixed-c', projectId: 'C', customerName: '混合客户', projectName: '同名项目', salesManager: '销售乙' })
+    ];
+    const findings = evaluateRulePack(rows, today);
+    const rowKeysFor = (ruleId: string) => findings.filter((item) => item.ruleId === ruleId).map((item) => item.rowKey).sort();
+
+    expect(rowKeysFor('duplicate-project')).toEqual(['mixed-a', 'mixed-b']);
+    expect(rowKeysFor('cross-seller-collision')).toEqual(['mixed-a', 'mixed-b', 'mixed-c']);
+  });
+
+  it('does not infer duplicate creation or collision from records sharing one project code', () => {
+    const rows = [
+      makeProject({ sourceKey: 'same-a', projectId: 'SAME', customerName: '同一客户', projectName: '同一项目', salesManager: '销售甲' }),
+      makeProject({ sourceKey: 'same-b', projectId: 'SAME', customerName: '同一客户', projectName: '同一项目', salesManager: '销售乙' })
+    ];
+    const findings = evaluateRulePack(rows, today);
+
+    expect(findings.filter((item) => item.ruleId === 'duplicate-record').map((item) => item.rowKey).sort()).toEqual(['same-a', 'same-b']);
+    expect(findings.some((item) => item.ruleId === 'duplicate-project' || item.ruleId === 'cross-seller-collision')).toBe(false);
+  });
+
   it('normalizes spacing but keeps phase, lot, and year differences distinct', () => {
     expect(normalizeProjectName('医院 数字化-改造')).toBe(normalizeProjectName('医院数字化改造'));
     expect(normalizeProjectName('ＡＢＣ项目')).toBe(normalizeProjectName('abc项目'));

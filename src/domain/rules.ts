@@ -261,13 +261,19 @@ function evaluateDuplicates(rows: ProjectRow[]): Finding[] {
 
   for (const group of byProject.values()) {
     if (group.length < 2) continue;
-    const distinctProjectIds = new Set(group.map((row) => row.projectId).filter(Boolean));
-    if (distinctProjectIds.size < 2) continue;
-    const distinctSellers = new Set(group.map((row) => row.salesManager).filter(Boolean));
-    if (distinctSellers.size > 1) {
-      results.push(...group.map((row) => finding(row, 'cross-seller-collision', '疑似重复与撞单', '疑似撞单待核验', '同一客户的同名项目由不同销售负责，需核验归属', 'review')));
-    } else if (distinctSellers.size === 1) {
-      results.push(...group.map((row) => finding(row, 'duplicate-project', '疑似重复与撞单', '疑似重复立项', '同一销售在同一客户下存在规范化后同名的不同项目编码', 'review')));
+    for (let leftIndex = 0; leftIndex < group.length; leftIndex += 1) {
+      const left = group[leftIndex];
+      for (let rightIndex = leftIndex + 1; rightIndex < group.length; rightIndex += 1) {
+        const right = group[rightIndex];
+        if (!left.projectId || !right.projectId || left.projectId === right.projectId) continue;
+        if (left.salesManager && left.salesManager === right.salesManager) {
+          results.push(finding(left, 'duplicate-project', '疑似重复与撞单', '疑似重复立项', '同一销售在同一客户下存在规范化后同名的不同项目编码', 'review'));
+          results.push(finding(right, 'duplicate-project', '疑似重复与撞单', '疑似重复立项', '同一销售在同一客户下存在规范化后同名的不同项目编码', 'review'));
+        } else if (left.salesManager && right.salesManager && left.salesManager !== right.salesManager) {
+          results.push(finding(left, 'cross-seller-collision', '疑似重复与撞单', '疑似撞单待核验', '同一客户的同名项目由不同销售负责，需核验归属', 'review'));
+          results.push(finding(right, 'cross-seller-collision', '疑似重复与撞单', '疑似撞单待核验', '同一客户的同名项目由不同销售负责，需核验归属', 'review'));
+        }
+      }
     }
   }
 
@@ -285,7 +291,7 @@ function evaluateDuplicates(rows: ProjectRow[]): Finding[] {
       results.push(finding(right, 'similar-name', '疑似重复与撞单', '名称相似待核验', `与“${left.projectName}”名称相似，仅作人工核验提示`, 'info'));
     }
   }
-  return results;
+  return [...new Map(results.map((item) => [`${item.rowKey}\u0000${item.ruleId}`, item])).values()];
 }
 
 function evaluateProbability(row: ProjectRow): Finding[] {
