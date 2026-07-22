@@ -22,12 +22,14 @@
 
 .result-areas {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 18px;
 }
 
 .result-section {
   background: #fff;
   border: 1px solid #dce6e6;
+  min-width: 0;
 }
 
 .result-count {
