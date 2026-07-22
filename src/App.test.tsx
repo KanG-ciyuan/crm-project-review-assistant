@@ -260,3 +260,74 @@ it('projects one global filter across metrics and result areas without changing 
   expect(within(projectCountMetric).getByText('2')).toBeInTheDocument();
   expect(within(maintenance).getByText('华南超期项目')).toBeInTheDocument();
 });
+
+it('analyzes an arbitrary Excel workflow and keeps seller filters, findings, metrics, and report in sync', async () => {
+  const user = userEvent.setup();
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([
+    ['销售机会运营台账'],
+    ['机会主键', '机会主题', '客户主体', '负责团队', '业务人员', '推进阶段', '预计规模', '登记时间', '末次联系', '计划成交日', '成功可能性'],
+    ['OP-001', '甲方超期商机', '客户甲', '企业一部', '销售甲', '持续推进', 100, '2026-01-01', '2026-06-01', '2026-09-01', '40%'],
+    ['OP-002', '乙方正常商机', '客户乙', '企业二部', '销售乙', '持续推进', 200, '2026-02-01', '2026-07-15', '2026-09-15', '70%'],
+    ['OP-003', '丙方正常商机', '客户丙', '企业二部', '销售乙', '持续推进', 300, '2026-03-01', '2026-07-18', '2026-10-01', '80%']
+  ]), '自定义机会表');
+  const bytes = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+  vi.useFakeTimers({ shouldAdvanceTime: true });
+  vi.setSystemTime(new Date('2026-07-21T09:00:00+08:00'));
+
+  render(<App />);
+  await user.upload(
+    screen.getByLabelText('选择 .xlsx 文件'),
+    new File([bytes], '企业机会台账.xlsx', { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+  );
+
+  expect(await screen.findByRole('heading', { name: '确认表头行' })).toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: '确认表头行' }));
+
+  const fieldTargets: Record<string, string> = {
+    机会主键: 'projectId',
+    机会主题: 'projectName',
+    客户主体: 'customerName',
+    负责团队: 'department',
+    业务人员: 'salesManager',
+    推进阶段: 'status',
+    预计规模: 'amount',
+    登记时间: 'createdAt',
+    末次联系: 'lastFollowUpAt',
+    计划成交日: 'expectedSignAt',
+    成功可能性: 'probabilityBand'
+  };
+  for (const [sourceHeader, targetField] of Object.entries(fieldTargets)) {
+    await user.selectOptions(screen.getByLabelText(`${sourceHeader}处理方式`), 'standard');
+    await user.selectOptions(screen.getByLabelText(`${sourceHeader}标准字段`), targetField);
+  }
+  await user.click(screen.getByRole('button', { name: '确认字段关系' }));
+  await user.selectOptions(screen.getByLabelText('持续推进对应状态'), '跟进中');
+  await user.selectOptions(screen.getByLabelText('40%对应概率'), '低概率');
+  await user.selectOptions(screen.getByLabelText('70%对应概率'), '中等概率');
+  await user.selectOptions(screen.getByLabelText('80%对应概率'), '较高概率');
+  await user.selectOptions(screen.getByLabelText('统一金额单位'), '万元');
+  await user.click(screen.getByRole('button', { name: '确认状态口径' }));
+  await user.click(screen.getByRole('button', { name: '开始规则分析' }));
+
+  const overview = screen.getByRole('region', { name: '经营概览' });
+  const projectCountMetric = within(overview).getByText('项目总数').closest('article')!;
+  const amountMetric = within(overview).getByText('储备金额').closest('article')!;
+  expect(screen.getByText('当前筛选 3 / 全部 3 个项目')).toBeInTheDocument();
+  expect(within(projectCountMetric).getByText('3')).toBeInTheDocument();
+  expect(within(amountMetric).getByText('600')).toBeInTheDocument();
+  const maintenance = screen.getByRole('region', { name: '维护超期待整改' });
+  expect(within(maintenance).getByText('甲方超期商机')).toBeInTheDocument();
+  expect(within(maintenance).getByText('跟进超期')).toBeInTheDocument();
+
+  await user.click(screen.getByRole('checkbox', { name: '销售甲 1个项目' }));
+
+  expect(screen.getByText('当前筛选 1 / 全部 3 个项目')).toBeInTheDocument();
+  expect(within(projectCountMetric).getByText('1')).toBeInTheDocument();
+  expect(within(amountMetric).getByText('100')).toBeInTheDocument();
+  const report = (screen.getByLabelText('经营复盘草稿') as HTMLTextAreaElement).value;
+  expect(report).toContain('销售经理：销售甲');
+  expect(report).toContain('甲方超期商机');
+  expect(report).toContain('跟进超期');
+  expect(report).not.toContain('乙方正常商机');
+});
