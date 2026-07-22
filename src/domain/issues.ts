@@ -1,27 +1,31 @@
-import type { Issue } from './analyze';
+import type { Finding } from './rules';
 
 export interface ProjectIssueGroup {
   reviewKey: string;
   projectId: string;
   projectName: string;
+  customerName: string;
+  department: string;
   salesManager: string;
-  amount: number | null;
-  issues: Issue[];
+  amountWan: number | null;
+  findings: Finding[];
 }
 
-export function groupIssuesByProject(issues: Issue[]): ProjectIssueGroup[] {
+export function groupIssuesByProject(findings: Finding[]): ProjectIssueGroup[] {
   const groups = new Map<string, ProjectIssueGroup>();
-  for (const issue of issues) {
-    const reviewKey = issue.reviewKey || issue.projectId;
+  for (const item of findings) {
+    const reviewKey = item.rowKey;
     const group = groups.get(reviewKey) ?? {
       reviewKey,
-      projectId: issue.projectId,
-      projectName: issue.projectName,
-      salesManager: issue.salesManager,
-      amount: issue.amount,
-      issues: []
+      projectId: item.projectId,
+      projectName: item.projectName,
+      customerName: item.customerName,
+      department: item.department,
+      salesManager: item.salesManager,
+      amountWan: item.amountWan,
+      findings: []
     };
-    group.issues.push(issue);
+    group.findings.push(item);
     groups.set(reviewKey, group);
   }
   return [...groups.values()];

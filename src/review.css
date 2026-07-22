@@ -4,6 +4,78 @@
   gap: 8px;
 }
 
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.analysis-results {
+  min-width: 0;
+}
+
+.result-areas {
+  display: grid;
+  gap: 18px;
+}
+
+.result-section {
+  background: #fff;
+  border: 1px solid #dce6e6;
+}
+
+.result-count {
+  color: #52676d;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.finding-stack {
+  display: grid;
+  gap: 7px;
+  max-width: 360px;
+  white-space: normal;
+}
+
+.finding-stack > div {
+  align-items: flex-start;
+  display: flex;
+  gap: 7px;
+  line-height: 1.45;
+}
+
+.finding-stack .tag {
+  flex: 0 0 auto;
+}
+
+.finding-review {
+  color: #946203;
+  background: #fff1d5;
+}
+
+.finding-action {
+  color: #a53d3b;
+  background: #fde8e7;
+}
+
+.finding-info,
+.information-state {
+  color: #376669;
+  background: #e8f4f2;
+}
+
+.information-state {
+  display: inline-block;
+  padding: 4px 7px;
+  font-size: 11px;
+}
+
 .review-control {
   display: grid;
   gap: 6px;

@@ -134,10 +134,10 @@ it('clears an existing analysis when the confirmed mapping is edited', async () 
   await user.click(screen.getByRole('button', { name: '确认字段关系' }));
   await user.click(screen.getByRole('button', { name: '确认状态口径' }));
   await user.click(screen.getByRole('button', { name: '开始规则分析' }));
-  expect(screen.getByRole('heading', { name: '数据质量与经营风险' })).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: '数据质量待复核' })).toBeInTheDocument();
 
   await user.click(screen.getByRole('button', { name: '返回' }));
-  expect(screen.queryByRole('heading', { name: '数据质量与经营风险' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('heading', { name: '数据质量待复核' })).not.toBeInTheDocument();
 });
 
 it('runs the confirmed 30-day rule pack and removes the legacy percentile rule', async () => {
@@ -162,9 +162,9 @@ it('runs the confirmed 30-day rule pack and removes the legacy percentile rule',
   await user.click(screen.getByRole('button', { name: '确认状态口径' }));
   await user.click(screen.getByRole('button', { name: '开始规则分析' }));
 
-  const resultsTable = screen.getByRole('table');
+  const resultsTable = within(screen.getByRole('region', { name: '维护超期待整改' })).getByRole('table');
   expect(within(resultsTable).getAllByText('跟进超期')).toHaveLength(1);
-  expect(within(screen.getByText('31天项目').closest('tr')!).getByText('跟进超期')).toBeInTheDocument();
-  expect(within(screen.getByText('21天项目').closest('tr')!).queryByText('跟进超期')).not.toBeInTheDocument();
+  expect(within(within(resultsTable).getByText('31天项目').closest('tr')!).getByText('跟进超期')).toBeInTheDocument();
+  expect(within(resultsTable).queryByText('21天项目')).not.toBeInTheDocument();
   expect(screen.queryByText('高金额低确定性')).not.toBeInTheDocument();
 });
