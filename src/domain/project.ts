@@ -18,6 +18,7 @@ export interface ProjectRow {
   salesManager: string;
   status: ProjectStatus;
   amount: number | null;
+  amountParseError: boolean;
   unit: '元' | '万元' | '亿元' | string;
   createdAt: string | null;
   lastFollowUpAt: string | null;

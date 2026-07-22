@@ -10,6 +10,7 @@ export function makeProject(overrides: Partial<ProjectRow> = {}): ProjectRow {
     salesManager: '销售甲',
     status: '跟进中',
     amount: 1200,
+    amountParseError: false,
     unit: '万元',
     createdAt: '2026-01-01',
     lastFollowUpAt: '2026-07-01',

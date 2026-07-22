@@ -61,10 +61,10 @@ export const RULE_DEFINITIONS: RuleDefinition[] = [
   { id: 'amount-required', name: '储备金额必须大于 0', category: '数据质量待复核', requiredFields: ['amount', 'unit'], adjustable: false },
   { id: 'amount-tier', name: '重点项目金额分档', category: '重点项目复盘', requiredFields: ['amount', 'unit'], adjustable: false },
   { id: 'amount-placeholder', name: '疑似占位金额', category: '数据质量待复核', requiredFields: ['salesManager', 'amount', 'unit'], adjustable: false },
-  { id: 'duplicate-record', name: '重复记录待核实', category: '疑似重复与撞单', requiredFields: ['projectId'], adjustable: false },
-  { id: 'duplicate-project', name: '疑似重复立项', category: '疑似重复与撞单', requiredFields: ['customerName', 'projectName'], adjustable: false },
-  { id: 'cross-seller-collision', name: '疑似撞单待核验', category: '疑似重复与撞单', requiredFields: ['customerName', 'projectName', 'salesManager'], adjustable: false },
-  { id: 'similar-name', name: '名称相似待核验', category: '经营结构分析', requiredFields: ['customerName', 'projectName'], adjustable: false },
+  { id: 'duplicate-record', name: '重复记录待核实', category: '数据质量待复核', requiredFields: ['projectId'], adjustable: false },
+  { id: 'duplicate-project', name: '疑似重复立项', category: '疑似重复与撞单', requiredFields: ['projectId', 'customerName', 'projectName', 'salesManager'], adjustable: false },
+  { id: 'cross-seller-collision', name: '疑似撞单待核验', category: '疑似重复与撞单', requiredFields: ['projectId', 'customerName', 'projectName', 'salesManager'], adjustable: false },
+  { id: 'similar-name', name: '名称相似待核验', category: '疑似重复与撞单', requiredFields: ['customerName', 'projectName'], adjustable: false },
   { id: 'probability-observation', name: '询价及低概率项目', category: '经营结构分析', requiredFields: ['probabilityBand'], adjustable: false },
   { id: 'reserve-cycle', name: '储备周期观察', category: '经营结构分析', requiredFields: ['status', 'createdAt'], adjustable: false }
 ];
@@ -143,6 +143,7 @@ function evaluateDates(row: ProjectRow, today: Date): Finding[] {
   const lastFollowUpAt = parseStrictDate(row.lastFollowUpAt);
   const expectedSignAt = parseStrictDate(row.expectedSignAt);
   const isOpen = row.status === '跟进中' || row.status === '呆滞';
+  const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
 
   if (createdAt && lastFollowUpAt && lastFollowUpAt < createdAt) {
     results.push(finding(row, 'date-last-follow-up', '数据质量待复核', '跟进日期逻辑异常', '最近跟进日期早于项目创建日期', 'review'));
@@ -151,16 +152,16 @@ function evaluateDates(row: ProjectRow, today: Date): Finding[] {
   const impossibleSigningDate = Boolean(createdAt && expectedSignAt && expectedSignAt < createdAt);
   if (impossibleSigningDate) {
     results.push(finding(row, 'date-expected-sign', '数据质量待复核', '签约日期逻辑异常', '预计签约日期早于项目创建日期', 'review'));
-  } else if (isOpen && expectedSignAt && expectedSignAt < today) {
+  } else if (isOpen && expectedSignAt && expectedSignAt < todayStart) {
     results.push(finding(row, 'signing-overdue', '维护超期待整改', '签约日期超期未更新', '预计签约日期已过，应在 24 小时内回到 CRM 更新日期或项目状态', 'action'));
   }
 
-  if (isOpen && lastFollowUpAt && daysBetween(lastFollowUpAt, today) > FOLLOW_UP_LIMIT_DAYS) {
+  if (isOpen && lastFollowUpAt && daysBetween(lastFollowUpAt, todayStart) > FOLLOW_UP_LIMIT_DAYS) {
     results.push(finding(row, 'follow-up-overdue', '维护超期待整改', '跟进超期', `距离最近一次电话、微信或现场跟进已超过 ${FOLLOW_UP_LIMIT_DAYS} 天`, 'action'));
   }
 
   if (isOpen && createdAt) {
-    const reserveDays = daysBetween(createdAt, today);
+    const reserveDays = daysBetween(createdAt, todayStart);
     if (reserveDays > LONG_TERM_DAYS) {
       results.push(finding(row, 'reserve-cycle', '经营结构分析', '长期储备项目', `项目储备已超过 ${LONG_TERM_DAYS} 天`, 'info'));
     } else if (reserveDays > LONG_CYCLE_DAYS) {
@@ -171,6 +172,9 @@ function evaluateDates(row: ProjectRow, today: Date): Finding[] {
 }
 
 function evaluateAmount(row: ProjectRow): Finding[] {
+  if (row.amountParseError) {
+    return [finding(row, 'amount-required', '数据质量待复核', '金额格式异常', '储备金额原值无法识别为有效数值', 'review')];
+  }
   if (row.amount === null || row.amount === 0) {
     return [finding(row, 'amount-required', '数据质量待复核', '储备金额待补充', '询价类项目也必须填写大于 0 的储备金额', 'review')];
   }
@@ -252,14 +256,18 @@ function evaluateDuplicates(rows: ProjectRow[]): Finding[] {
 
   for (const group of byId.values()) {
     if (group.length < 2) continue;
-    results.push(...group.map((row) => finding(row, 'duplicate-record', '疑似重复与撞单', '重复记录待核实', '相同项目编码出现多条记录，需检查 CRM 导出或数据重复', 'review')));
+    results.push(...group.map((row) => finding(row, 'duplicate-record', '数据质量待复核', '重复记录待核实', '相同项目编码出现多条记录，需检查 CRM 导出或数据重复', 'review')));
   }
 
   for (const group of byProject.values()) {
     if (group.length < 2) continue;
-    results.push(...group.map((row) => finding(row, 'duplicate-project', '疑似重复与撞单', '疑似重复立项', '同一客户下存在规范化后同名的多条项目记录', 'review')));
-    if (new Set(group.map((row) => row.salesManager).filter(Boolean)).size > 1) {
+    const distinctProjectIds = new Set(group.map((row) => row.projectId).filter(Boolean));
+    if (distinctProjectIds.size < 2) continue;
+    const distinctSellers = new Set(group.map((row) => row.salesManager).filter(Boolean));
+    if (distinctSellers.size > 1) {
       results.push(...group.map((row) => finding(row, 'cross-seller-collision', '疑似重复与撞单', '疑似撞单待核验', '同一客户的同名项目由不同销售负责，需核验归属', 'review')));
+    } else if (distinctSellers.size === 1) {
+      results.push(...group.map((row) => finding(row, 'duplicate-project', '疑似重复与撞单', '疑似重复立项', '同一销售在同一客户下存在规范化后同名的不同项目编码', 'review')));
     }
   }
 
@@ -273,8 +281,8 @@ function evaluateDuplicates(rows: ProjectRow[]): Finding[] {
       const rightName = normalizeProjectName(right.projectName);
       if (distinctProjectMarkers(left.projectName, right.projectName)) continue;
       if (!conservativeSimilarity(leftName, rightName)) continue;
-      results.push(finding(left, 'similar-name', '经营结构分析', '名称相似待核验', `与“${right.projectName}”名称相似，仅作人工核验提示`, 'info'));
-      results.push(finding(right, 'similar-name', '经营结构分析', '名称相似待核验', `与“${left.projectName}”名称相似，仅作人工核验提示`, 'info'));
+      results.push(finding(left, 'similar-name', '疑似重复与撞单', '名称相似待核验', `与“${right.projectName}”名称相似，仅作人工核验提示`, 'info'));
+      results.push(finding(right, 'similar-name', '疑似重复与撞单', '名称相似待核验', `与“${left.projectName}”名称相似，仅作人工核验提示`, 'info'));
     }
   }
   return results;
@@ -285,15 +293,28 @@ function evaluateProbability(row: ProjectRow): Finding[] {
   return [finding(row, 'probability-observation', '经营结构分析', '询价及低概率项目', `当前成单概率为${row.probabilityBand}，仅纳入经营结构观察`, 'info')];
 }
 
-export function evaluateRulePack(rows: ProjectRow[], today: Date): Finding[] {
+export interface RuleEvaluationOptions {
+  mappedFields?: Set<CanonicalFieldKey>;
+  enabledRuleIds?: Set<string>;
+}
+
+export function evaluateRulePack(rows: ProjectRow[], today: Date, options: RuleEvaluationOptions = {}): Finding[] {
   const rowFindings = rows.flatMap((row) => [
     ...evaluateProbability(row),
     ...evaluateDates(row, today),
     ...evaluateAmount(row)
   ]);
-  return [
+  const findings = [
     ...rowFindings,
     ...evaluateRepeatedAmounts(rows),
     ...evaluateDuplicates(rows)
   ];
+  const availableRuleIds = options.mappedFields
+    ? new Set(getRuleCapabilities(options.mappedFields).filter((item) => item.available).map((item) => item.ruleId))
+    : null;
+  return findings.filter((item) => {
+    const capabilityRuleId = item.ruleId.startsWith('amount-tier') ? 'amount-tier' : item.ruleId;
+    return (!availableRuleIds || availableRuleIds.has(capabilityRuleId))
+      && (!options.enabledRuleIds || options.enabledRuleIds.has(capabilityRuleId));
+  });
 }

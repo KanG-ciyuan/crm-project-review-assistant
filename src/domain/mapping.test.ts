@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { amountInWan } from './project';
+import { evaluateRulePack } from './rules';
 import {
   applyMappings,
   emptyValueMappings,
@@ -9,6 +10,20 @@ import {
 } from './mapping';
 
 describe('field mappings', () => {
+  it('preserves a non-empty unparseable amount for rule-level format review', () => {
+    const rows = applyMappings(
+      [{ 项目名称: '医院数改', 储备金额: '待确认' }],
+      [
+        { sourceHeader: '项目名称', mode: 'standard', targetField: 'projectName' },
+        { sourceHeader: '储备金额', mode: 'standard', targetField: 'amount' }
+      ],
+      { ...emptyValueMappings, amountUnit: '万元' },
+      '商机表'
+    );
+    expect(rows[0]).toMatchObject({ amount: null, amountParseError: true });
+    expect(evaluateRulePack(rows, new Date('2026-07-21')).map((item) => item.label)).toContain('金额格式异常');
+    expect(evaluateRulePack(rows, new Date('2026-07-21')).map((item) => item.label)).not.toContain('储备金额待补充');
+  });
   it('suggests canonical fields from local aliases without an API call', () => {
     expect(suggestMappings(['商机名称', '业务负责人', '客户', '最后联系时间']))
       .toMatchObject([

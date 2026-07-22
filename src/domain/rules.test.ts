@@ -96,17 +96,24 @@ describe('confirmed To B rule pack', () => {
     expect(evaluateRulePack(rows, today).filter((item) => item.label === '疑似占位金额')).toHaveLength(0);
   });
 
-  it('separates duplicate records, duplicate creation, and cross-seller collision', () => {
+  it('separates duplicate records, duplicate creation, and cross-seller collision by row', () => {
     const rows = [
-      makeProject({ sourceKey: 'a', projectId: 'DUP-1' }),
-      makeProject({ sourceKey: 'b', projectId: 'DUP-1' }),
-      makeProject({ sourceKey: 'c', projectId: 'NEW-2', salesManager: '销售甲' }),
-      makeProject({ sourceKey: 'd', projectId: 'NEW-3', salesManager: '销售乙' })
+      makeProject({ sourceKey: 'record-a', projectId: 'DUP-1', customerName: '客户一', projectName: '编码重复甲' }),
+      makeProject({ sourceKey: 'record-b', projectId: 'DUP-1', customerName: '客户二', projectName: '编码重复乙' }),
+      makeProject({ sourceKey: 'project-a', projectId: 'NEW-1', customerName: '客户三', projectName: '同一项目', salesManager: '销售甲' }),
+      makeProject({ sourceKey: 'project-b', projectId: 'NEW-2', customerName: '客户三', projectName: '同一 项目', salesManager: '销售甲' }),
+      makeProject({ sourceKey: 'collision-a', projectId: 'NEW-3', customerName: '客户四', projectName: '撞单项目', salesManager: '销售甲' }),
+      makeProject({ sourceKey: 'collision-b', projectId: 'NEW-4', customerName: '客户四', projectName: '撞单项目', salesManager: '销售乙' })
     ];
-    const labels = evaluateRulePack(rows, today).map((item) => item.label);
-    expect(labels).toEqual(expect.arrayContaining([
-      '重复记录待核实', '疑似重复立项', '疑似撞单待核验'
-    ]));
+    const findings = evaluateRulePack(rows, today);
+    const labelsFor = (rowKey: string) => findings.filter((item) => item.rowKey === rowKey).map((item) => item.label);
+
+    expect(labelsFor('record-a')).toContain('重复记录待核实');
+    expect(labelsFor('record-a')).not.toEqual(expect.arrayContaining(['疑似重复立项', '疑似撞单待核验']));
+    expect(labelsFor('project-a')).toContain('疑似重复立项');
+    expect(labelsFor('project-a')).not.toEqual(expect.arrayContaining(['重复记录待核实', '疑似撞单待核验']));
+    expect(labelsFor('collision-a')).toContain('疑似撞单待核验');
+    expect(labelsFor('collision-a')).not.toEqual(expect.arrayContaining(['重复记录待核实', '疑似重复立项']));
   });
 
   it('normalizes spacing but keeps phase, lot, and year differences distinct', () => {
@@ -125,6 +132,7 @@ describe('confirmed To B rule pack', () => {
     const findings = evaluateRulePack(rows, today).filter((item) => item.rowKey.startsWith('similar'));
     expect(findings.map((item) => item.label)).toContain('名称相似待核验');
     expect(findings.find((item) => item.label === '名称相似待核验')?.level).toBe('info');
+    expect(findings.find((item) => item.label === '名称相似待核验')?.category).toBe('疑似重复与撞单');
     expect(findings.map((item) => item.label)).not.toContain('疑似撞单待核验');
   });
 
@@ -165,5 +173,34 @@ describe('confirmed To B rule pack', () => {
       available: false,
       missingFields: ['expectedSignAt']
     }));
+  });
+
+  it('does not execute rules whose required source columns are unavailable', () => {
+    const findings = evaluateRulePack(
+      [makeProject({ amount: null, expectedSignAt: '2026-07-01' })],
+      today,
+      { mappedFields: new Set(['projectName', 'status']) }
+    );
+    expect(findings).toEqual([]);
+  });
+
+  it('treats a confirmed fixed amount unit as an available capability', () => {
+    const capabilities = getRuleCapabilities(new Set(['amount', 'unit']));
+    expect(capabilities.find((item) => item.ruleId === 'amount-tier')?.available).toBe(true);
+  });
+
+  it('does not treat an expected signing date on the analysis day as overdue', () => {
+    const findings = evaluateRulePack([
+      makeProject({ expectedSignAt: '2026-07-21' })
+    ], new Date('2026-07-21T16:30:00+08:00'));
+    expect(findings.map((item) => item.label)).not.toContain('签约日期超期未更新');
+  });
+
+  it('classifies duplicate records as data quality findings', () => {
+    const findings = evaluateRulePack([
+      makeProject({ sourceKey: 'a', projectId: 'SAME', customerName: '客户甲', projectName: '项目甲' }),
+      makeProject({ sourceKey: 'b', projectId: 'SAME', customerName: '客户乙', projectName: '项目乙' })
+    ], today).filter((item) => item.label === '重复记录待核实');
+    expect(findings.every((item) => item.category === '数据质量待复核')).toBe(true);
   });
 });

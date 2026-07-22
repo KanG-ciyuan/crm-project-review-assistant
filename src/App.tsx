@@ -2,13 +2,11 @@ import { useMemo, useState } from 'react';
 import { Copy, Download, FileSpreadsheet, GitFork, Mail, ShieldCheck, Upload } from 'lucide-react';
 import './review.css';
 import { ImportWizard, type ImportReadyPayload } from './components/ImportWizard';
-import { analyzeProjects, type AnalysisResult, type Thresholds } from './domain/analyze';
+import { adaptFindingsForLegacyView, evaluateRulePack, type AnalysisResult, type CanonicalFieldKey } from './domain/analyze';
 import { groupIssuesByProject, type ProjectIssueGroup } from './domain/issues';
 import { createReviewReport } from './domain/report';
 import { REVIEW_STATUSES, loadReviewRecords, reconcileReviewRecords, saveReviewRecords, updateReviewRecord, type ReviewRecordMap, type ReviewStatus } from './domain/review';
 import { inspectSheet, inspectWorkbook, type WorkbookInspection } from './lib/workbook';
-
-const defaultThresholds: Thresholds = { followUpDays: 14, longReserveDays: 90, absoluteAmountLimitWan: 10000 };
 
 const formatAmount = (value: number) => value.toLocaleString('zh-CN', { maximumFractionDigits: 2 });
 
@@ -18,7 +16,6 @@ export default function App() {
   const [sheetName, setSheetName] = useState('');
   const [importRevision, setImportRevision] = useState(0);
   const [importReady, setImportReady] = useState<ImportReadyPayload | null>(null);
-  const [thresholds, setThresholds] = useState(defaultThresholds);
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
   const [report, setReport] = useState('');
   const [error, setError] = useState('');
@@ -55,7 +52,13 @@ export default function App() {
 
   function startAnalysis(payload: ImportReadyPayload) {
     const now = new Date();
-    const result = analyzeProjects(payload.rows, thresholds, now);
+    const mappedFields = new Set<CanonicalFieldKey>();
+    for (const mapping of payload.mappings) {
+      if (mapping.mode === 'standard' && mapping.targetField) mappedFields.add(mapping.targetField);
+    }
+    if (mappedFields.has('amount') && payload.valueMappings.amountUnit) mappedFields.add('unit');
+    const nextFindings = evaluateRulePack(payload.rows, now, { mappedFields });
+    const result = adaptFindingsForLegacyView(payload.rows, nextFindings);
     const groups = groupIssuesByProject(result.issues);
     const nextReviews = reconcileReviewRecords(result.rows, groups.map((group) => group.reviewKey), reviewRecords, now);
     saveReviewRecords(nextReviews, window.localStorage);
@@ -114,7 +117,9 @@ export default function App() {
       </div>
       {inspection && <div className="side-section"><p className="side-label">工作表</p><select aria-label="工作表" value={sheetName} onChange={(event) => { setSheetName(event.target.value); setImportReady(null); setAnalysis(null); setReport(''); }}>{inspection.sheetNames.map((name) => <option key={name}>{name}</option>)}</select>
         <p className="side-label threshold-title">规则阈值</p>
-        {isCrmHistory ? <><Threshold label="跟进停滞天数" value={30} suffix="天" onChange={() => undefined} disabled /><Threshold label="金额复核上限" value={thresholds.absoluteAmountLimitWan} suffix="万元" onChange={(value) => setThresholds({ ...thresholds, absoluteAmountLimitWan: value })} /><p className="rule-note">呆滞由销售手动标记；低概率项目仅进入观察清单，不计入风险。</p></> : <><Threshold label="跟进停滞天数" value={thresholds.followUpDays} suffix="天" onChange={(value) => setThresholds({ ...thresholds, followUpDays: value })} /><Threshold label="长期储备天数" value={thresholds.longReserveDays} suffix="天" onChange={(value) => setThresholds({ ...thresholds, longReserveDays: value })} /><Threshold label="金额复核上限" value={thresholds.absoluteAmountLimitWan} suffix="万元" onChange={(value) => setThresholds({ ...thresholds, absoluteAmountLimitWan: value })} /></>}
+        <Threshold label="跟进维护周期" value={30} suffix="天" />
+        <Threshold label="重点项目金额" value={1000} suffix="万元" />
+        <p className="rule-note">规则包按已确认业务口径运行；未映射字段对应的规则会跳过。</p>
       </div>}
       <div className="sidebar-note"><ShieldCheck size={16} /><span>文件仅在当前浏览器中读取和分析，不会上传原始 Excel。</span></div>
     </aside>
@@ -127,7 +132,7 @@ export default function App() {
           <Metric label="项目总数" value={analysis.overview.projectCount} sub="本次导入" />
           <Metric label="储备金额" value={formatAmount(analysis.overview.totalAmountWan)} sub="单位：万元" />
           <Metric label="跟进中" value={analysis.overview.inProgressCount} sub="项目" />
-          {isCrmHistory ? <><Metric label="手动标记呆滞" value={analysis.manualStagnationProjects.length} sub="项目" /><Metric label="跟进停滞" value={countIssues(analysis, '跟进停滞')} sub="超过 30 天" risk /><Metric label="签约预期失效" value={countIssues(analysis, '签约预期失效')} sub="需要更新" risk /></> : <><Metric label="已签约" value={analysis.overview.signedCount} sub="项目" /><Metric label="已丢单" value={analysis.overview.lostCount} sub="项目" /><Metric label="风险项目" value={analysis.overview.riskProjectCount} sub="待跟进" risk /></>}
+          {isCrmHistory ? <><Metric label="手动标记呆滞" value={analysis.manualStagnationProjects.length} sub="项目" /><Metric label="跟进超期" value={countIssues(analysis, '跟进超期')} sub="超过 30 天" risk /><Metric label="签约日期超期" value={countIssues(analysis, '签约日期超期未更新')} sub="需要更新" risk /></> : <><Metric label="已签约" value={analysis.overview.signedCount} sub="项目" /><Metric label="已丢单" value={analysis.overview.lostCount} sub="项目" /><Metric label="待复盘项目" value={analysis.overview.riskProjectCount} sub="需核验或整改" risk /></>}
         </section>
         <section className="summary-grid"><Breakdown title="部门储备金额分布" items={analysis.byDepartment} /><Breakdown title="销售经理储备金额分布" items={analysis.bySalesManager} /></section>
         <section className="table-card"><div className="table-heading"><div><h2>数据质量与经营风险</h2><p>同一项目的多个标签会合并展示；标签为规则提示，不代表系统已确认原始数据错误。</p></div><div className="table-filters"><select aria-label="风险类型" value={category} onChange={(event) => setCategory(event.target.value)}><option>全部</option><option>数据质量</option><option>经营风险</option></select><select aria-label="审查状态筛选" value={reviewStatusFilter} onChange={(event) => setReviewStatusFilter(event.target.value as '全部' | ReviewStatus)}><option>全部</option>{REVIEW_STATUSES.map((status) => <option key={status}>{status}</option>)}</select></div></div><IssueTable groups={visibleIssueGroups} reviews={reviewRecords} onChangeReview={changeReview} /></section>
@@ -146,8 +151,8 @@ export default function App() {
   </div>;
 }
 
-function Threshold({ label, value, suffix, onChange, disabled = false }: { label: string; value: number; suffix: string; onChange: (value: number) => void; disabled?: boolean }) {
-  return <label className="threshold"><span>{label}</span><div><input type="number" min="1" value={value} disabled={disabled} onChange={(event) => onChange(Number(event.target.value))} /><em>{suffix}</em></div></label>;
+function Threshold({ label, value, suffix }: { label: string; value: number; suffix: string }) {
+  return <label className="threshold"><span>{label}</span><div><input type="number" min="1" value={value} disabled /><em>{suffix}</em></div></label>;
 }
 
 function Metric({ label, value, sub, risk = false }: { label: string; value: string | number; sub: string; risk?: boolean }) { return <article className="metric"><span>{label}</span><strong className={risk ? 'risk-value' : ''}>{value}</strong><small>{sub}</small></article>; }

@@ -227,6 +227,7 @@ const emptyProject = (): ProjectRow => ({
   salesManager: '',
   status: '未知',
   amount: null,
+  amountParseError: false,
   unit: '',
   createdAt: null,
   lastFollowUpAt: null,
@@ -247,7 +248,11 @@ function assignStandardField(
   values: ValueMappings
 ) {
   switch (field) {
-    case 'amount': row.amount = toAmount(value); break;
+    case 'amount': {
+      row.amount = toAmount(value);
+      row.amountParseError = isPresent(value) && row.amount === null;
+      break;
+    }
     case 'status': row.status = toStatus(value, values); break;
     case 'probabilityBand': row.probabilityBand = toProbability(value, values); break;
     case 'unit': row.unit = isPresent(value) ? toUnit(values.amountUnit) : ''; break;

@@ -37,6 +37,7 @@ export function createProjectFingerprint(row: ProjectRow) {
     normalized(row.customerName),
     normalized(row.projectName),
     normalized(row.amount),
+    normalized(row.amountParseError),
     normalized(row.unit),
     normalized(row.status),
     normalized(row.probabilityBand),

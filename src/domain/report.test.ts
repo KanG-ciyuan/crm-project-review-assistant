@@ -6,6 +6,7 @@ import { makeProject } from '../test/fixtures';
 
 const analysis: AnalysisResult = {
   rows: [],
+  findings: [],
   issues: [
     { projectId: 'P-2026-024', projectName: '远景综合管廊项目', department: '营销三部', salesManager: '示例经理丙', amount: 50000, category: '数据质量', label: '金额需复核', reason: '超过本次复核上限', status: '待人工确认' },
     { projectId: 'P-2026-025', projectName: '云川河道治理项目', department: '营销一部', salesManager: '示例经理甲', amount: 290, category: '经营风险', label: '跟进停滞', reason: '距离最近拜访已超过 14 天', status: '待跟进' },
@@ -47,6 +48,7 @@ describe('createReviewReport', () => {
     const observation = makeProject({ sourceKey: 'crm-5', projectId: 'CRM-005', projectName: '北原综合管廊项目', department: '华东业务部', salesManager: '示例经理甲', amount: 1850, createdAt: '2026-04-26', lastFollowUpAt: '2026-07-05', expectedSignAt: '2026-11-10', probabilityBand: '低概率' });
     const crmAnalysis: AnalysisResult = {
       ...analysis,
+      findings: [],
       rows: [manualStagnation, observation],
       manualStagnationProjects: [manualStagnation],
       observationProjects: [observation]

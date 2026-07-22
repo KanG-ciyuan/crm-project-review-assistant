@@ -155,12 +155,13 @@ export function ImportWizard({ inspection, onReady, capabilities, onConfiguratio
     () => step === 4 ? applyMappings(records, mappings, valueMappings, inspection.sheetName) : [],
     [amountUnit, inspection.sheetName, mappings, probabilities, records, statuses, step]
   );
-  const mappedStandardFields = useMemo(
-    () => new Set(mappings
+  const mappedStandardFields = useMemo(() => {
+    const fields = new Set(mappings
       .filter((mapping): mapping is ColumnMapping & { targetField: CanonicalFieldKey } => mapping.mode === 'standard' && Boolean(mapping.targetField))
-      .map((mapping) => mapping.targetField)),
-    [mappings]
-  );
+      .map((mapping) => mapping.targetField));
+    if (fields.has('amount') && amountUnit) fields.add('unit');
+    return fields;
+  }, [amountUnit, mappings]);
   const ruleCapabilities = capabilities ?? getRuleCapabilities(mappedStandardFields);
 
   function finish() {

@@ -113,7 +113,9 @@ describe('ImportWizard', () => {
 
     expect(screen.getByRole('heading', { name: '确认分析范围' })).toBeInTheDocument();
     expect(screen.getByText('规则执行范围')).toBeInTheDocument();
-    expect(screen.getByText('重点项目金额分档')).toBeInTheDocument();
+    const amountTierRule = screen.getByText('重点项目金额分档').closest('li');
+    expect(amountTierRule).not.toBeNull();
+    expect(within(amountTierRule!).getByText('可执行')).toBeInTheDocument();
     expect(onReady).not.toHaveBeenCalled();
 
     await user.click(screen.getByRole('button', { name: '开始规则分析' }));
