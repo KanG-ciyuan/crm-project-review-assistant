@@ -138,7 +138,7 @@ export default function App() {
       {!inspection && <section className="empty import-guide"><FileSpreadsheet size={36} /><h2>上传 CRM 储备项目表</h2><p>支持未加密的 .xlsx 文件，可在导入向导中确认表头、字段关系和业务口径。</p><a className="sample-download" href="/CRM历史项目表-脱敏适配样表.xlsx" download><Download size={15} /> 下载脱敏示例表</a></section>}
       {sheetInspection && <ImportWizard key={`${importRevision}:${fileName}:${sheetName}`} inspection={sheetInspection} onReady={startAnalysis} onConfigurationChange={clearImportedAnalysis} />}
       {analysis && visibleAnalysis && <>
-        <AnalysisFilters analysis={analysis} filters={filters} reviews={reviewRecords} onChange={setFilters} />
+        <AnalysisFilters analysis={analysis} filters={filters} reviews={reviewRecords} selectedCount={selectedKeys.size} totalCount={analysis.rows.length} onChange={setFilters} />
         <AnalysisResults analysis={visibleAnalysis} reviews={reviewRecords} onChangeReview={changeReview} />
         <section className="report-card"><div className="table-heading"><div><h2>经营复盘草稿</h2><p>本地规则自动生成，可人工编辑后下载。</p></div><button className="secondary" onClick={downloadReport} disabled={!report}><Download size={15} /> 下载 Markdown</button></div><textarea value={report} onChange={(event) => setReport(event.target.value)} aria-label="经营复盘草稿" /></section>
       </>}

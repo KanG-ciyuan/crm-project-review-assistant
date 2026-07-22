@@ -42,7 +42,7 @@ export const EMPTY_FILTERS: FilterState = {
   projectTypes: [],
   projectLevels: [],
   query: '',
-  customValues: {}
+  customValues: Object.create(null) as Record<string, string[]>
 };
 
 export interface CountedOption<T extends string = string> {
@@ -52,33 +52,35 @@ export interface CountedOption<T extends string = string> {
 
 export interface BandDefinition {
   value: string;
-  min: number;
-  max: number;
+  min?: number;
+  maxExclusive?: number;
+  invalid?: 'missing' | 'non-positive';
+  positiveOnly?: boolean;
 }
 
 export const AMOUNT_BANDS: BandDefinition[] = [
-  { value: '普通', min: Number.MIN_VALUE, max: 999.999999 },
-  { value: '大额', min: 1000, max: 4999.999999 },
-  { value: '超大', min: 5000, max: 9999.999999 },
-  { value: '极端', min: 10_000, max: Number.POSITIVE_INFINITY },
-  { value: '金额异常', min: Number.NaN, max: Number.NaN }
+  { value: '普通', min: 0, maxExclusive: 1000, positiveOnly: true },
+  { value: '大额', min: 1000, maxExclusive: 5000, positiveOnly: true },
+  { value: '超大', min: 5000, maxExclusive: 10_000, positiveOnly: true },
+  { value: '极端', min: 10_000, maxExclusive: Number.POSITIVE_INFINITY, positiveOnly: true },
+  { value: '金额异常', invalid: 'non-positive' }
 ];
 
 export const FOLLOW_UP_BANDS: BandDefinition[] = [
-  { value: '0-7天', min: 0, max: 7 },
-  { value: '8-15天', min: 8, max: 15 },
-  { value: '16-30天', min: 16, max: 30 },
-  { value: '31-60天', min: 31, max: 60 },
-  { value: '61天以上', min: 61, max: Number.POSITIVE_INFINITY },
-  { value: '未填写或异常', min: Number.NaN, max: Number.NaN }
+  { value: '0-7天', min: 0, maxExclusive: 8 },
+  { value: '8-15天', min: 8, maxExclusive: 16 },
+  { value: '16-30天', min: 16, maxExclusive: 31 },
+  { value: '31-60天', min: 31, maxExclusive: 61 },
+  { value: '61天以上', min: 61, maxExclusive: Number.POSITIVE_INFINITY },
+  { value: '未填写或异常', invalid: 'missing' }
 ];
 
 export const RESERVE_CYCLE_BANDS: BandDefinition[] = [
-  { value: '0-90天', min: 0, max: 90 },
-  { value: '91-180天', min: 91, max: 180 },
-  { value: '181-365天', min: 181, max: 365 },
-  { value: '超过365天', min: 366, max: Number.POSITIVE_INFINITY },
-  { value: '未填写或异常', min: Number.NaN, max: Number.NaN }
+  { value: '0-90天', min: 0, maxExclusive: 91 },
+  { value: '91-180天', min: 91, maxExclusive: 181 },
+  { value: '181-365天', min: 181, maxExclusive: 366 },
+  { value: '超过365天', min: 366, maxExclusive: Number.POSITIVE_INFINITY },
+  { value: '未填写或异常', invalid: 'missing' }
 ];
 
 export interface FilterOptions {
@@ -123,8 +125,12 @@ function matchesBands(selected: string[], value: number | null, definitions: Ban
   return selected.some((selectedBand) => {
     const band = definitions.find((item) => item.value === selectedBand);
     if (!band) return false;
-    if (Number.isNaN(band.min)) return value === null || !Number.isFinite(value) || value <= 0;
-    return value !== null && Number.isFinite(value) && value >= band.min && value <= band.max;
+    if (band.invalid === 'non-positive') return value === null || !Number.isFinite(value) || value <= 0;
+    if (band.invalid === 'missing') return value === null || !Number.isFinite(value);
+    return value !== null && Number.isFinite(value)
+      && (!band.positiveOnly || value > 0)
+      && value >= (band.min ?? Number.NEGATIVE_INFINITY)
+      && value < (band.maxExclusive ?? Number.POSITIVE_INFINITY);
   });
 }
 
@@ -135,11 +141,8 @@ function ageInDays(value: string | null, today: Date) {
   return age >= 0 ? age : null;
 }
 
-function actionableReviewStatus(analysis: AnalysisResult, reviews: ReviewRecordMap, rowKey: string): ReviewStatus | null {
-  const hasActionableFinding = analysis.findings.some(
-    (finding) => finding.rowKey === rowKey && (finding.level === 'review' || finding.level === 'action')
-  );
-  if (!hasActionableFinding) return null;
+function actionableReviewStatus(actionableRowKeys: Set<string>, reviews: ReviewRecordMap, rowKey: string): ReviewStatus | null {
+  if (!actionableRowKeys.has(rowKey)) return null;
   const explicit = reviews[rowKey]?.status;
   if (explicit) return explicit;
   return '待复核';
@@ -169,10 +172,12 @@ export function filterProjectKeys(
 ): Set<string> {
   const today = analysisDate(analysis);
   const findingsByRow = new Map<string, typeof analysis.findings>();
+  const actionableRowKeys = new Set<string>();
   for (const finding of analysis.findings) {
     const list = findingsByRow.get(finding.rowKey) ?? [];
     list.push(finding);
     findingsByRow.set(finding.rowKey, list);
+    if (finding.level === 'review' || finding.level === 'action') actionableRowKeys.add(finding.rowKey);
   }
 
   return new Set(analysis.rows.filter((row) => {
@@ -181,7 +186,7 @@ export function filterProjectKeys(
     const amountWan = amountInWan(row);
     const followUpAge = ageInDays(row.lastFollowUpAt, today);
     const reserveAge = ageInDays(row.createdAt, today);
-    const reviewStatus = actionableReviewStatus(analysis, reviews, key);
+    const reviewStatus = actionableReviewStatus(actionableRowKeys, reviews, key);
     return matchesSelection(filters.departments, display(row.department))
       && matchesSelection(filters.salesManagers, display(row.salesManager))
       && matchesSelection(filters.statuses, row.status)
@@ -241,13 +246,18 @@ export function buildFilterOptions(analysis: AnalysisResult, filters: FilterStat
       customValues.set(field, values);
     }
   }
-  const customFields: Record<string, string[]> = {};
+  const customFields = Object.create(null) as Record<string, string[]>;
   for (const [field, values] of customValues) {
     if (values.size <= 20) customFields[field] = [...values].sort((left, right) => left.localeCompare(right, 'zh-CN'));
   }
   const categoryCounts = new Map(countFindings(analysis, 'category').map((item) => [item.value, item.count]));
+  const actionableRowKeys = new Set(
+    analysis.findings
+      .filter((finding) => finding.level === 'review' || finding.level === 'action')
+      .map((finding) => finding.rowKey)
+  );
   const reviewValues = analysis.rows.flatMap((row) => {
-    const status = actionableReviewStatus(analysis, reviews, projectKey(row));
+    const status = actionableReviewStatus(actionableRowKeys, reviews, projectKey(row));
     return status ? [status] : [];
   });
   return {

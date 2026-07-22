@@ -179,4 +179,46 @@ describe('global analysis filters', () => {
       { value: '已忽略', count: 0 }
     ]);
   });
+
+  it('uses gap-free half-open amount bands and selecting every band keeps every row', () => {
+    const rows = [
+      makeProject({ sourceKey: 'ordinary-edge', amount: 999.9999995 }),
+      makeProject({ sourceKey: 'large-edge', projectId: 'LARGE', amount: 4999.9999995 }),
+      makeProject({ sourceKey: 'very-large-edge', projectId: 'VERY-LARGE', amount: 9999.9999995 }),
+      makeProject({ sourceKey: 'extreme', projectId: 'EXTREME', amount: 10_000 }),
+      makeProject({ sourceKey: 'invalid', projectId: 'INVALID', amount: 0 })
+    ];
+    const analysis = buildAnalysis(rows, [], today);
+
+    expect(filterProjectKeys(analysis, {}, { ...EMPTY_FILTERS, amountBands: ['普通'] })).toEqual(new Set(['ordinary-edge']));
+    expect(filterProjectKeys(analysis, {}, { ...EMPTY_FILTERS, amountBands: ['大额'] })).toEqual(new Set(['large-edge']));
+    expect(filterProjectKeys(analysis, {}, { ...EMPTY_FILTERS, amountBands: ['超大'] })).toEqual(new Set(['very-large-edge']));
+    expect(filterProjectKeys(analysis, {}, { ...EMPTY_FILTERS, amountBands: ['极端'] })).toEqual(new Set(['extreme']));
+    expect(filterProjectKeys(analysis, {}, { ...EMPTY_FILTERS, amountBands: ['普通', '大额', '超大', '极端', '金额异常'] })).toEqual(new Set(rows.map((row) => row.sourceKey)));
+  });
+
+  it('keeps a same-day date in the zero-to-seven-day band', () => {
+    const row = makeProject({ sourceKey: 'today', lastFollowUpAt: '2026-07-21', createdAt: '2026-07-21' });
+    const analysis = buildAnalysis([row], [], today);
+
+    expect(filterProjectKeys(analysis, {}, { ...EMPTY_FILTERS, followUpBands: ['0-7天'], reserveCycleBands: ['0-90天'] })).toEqual(new Set(['today']));
+  });
+
+  it('preserves and filters prototype-like custom field names without pollution', () => {
+    const specialFields = Object.create(null) as Record<string, string>;
+    specialFields.__proto__ = '原型渠道';
+    Object.defineProperty(specialFields, 'constructor', { value: '构造渠道', enumerable: true, writable: true });
+    const row = makeProject({ sourceKey: 'special', customFields: specialFields });
+    const analysis = buildAnalysis([row], [], today);
+    const options = buildFilterOptions(analysis, EMPTY_FILTERS);
+    const customValues = Object.create(null) as Record<string, string[]>;
+    customValues.__proto__ = ['原型渠道'];
+    Object.defineProperty(customValues, 'constructor', { value: ['构造渠道'], enumerable: true, writable: true });
+
+    expect(Object.getPrototypeOf(options.customFields)).toBeNull();
+    expect(options.customFields.__proto__).toEqual(['原型渠道']);
+    expect(options.customFields['constructor']).toEqual(['构造渠道']);
+    expect(filterProjectKeys(analysis, {}, { ...EMPTY_FILTERS, customValues })).toEqual(new Set(['special']));
+    expect(({} as Record<string, unknown>).污染字段).toBeUndefined();
+  });
 });

@@ -1,9 +1,9 @@
+import { useMemo } from 'react';
 import { Search, X } from 'lucide-react';
 import type { AnalysisResult } from '../domain/analysis';
 import {
   EMPTY_FILTERS,
   buildFilterOptions,
-  filterProjectKeys,
   type CountedOption,
   type FilterState
 } from '../domain/filters';
@@ -13,6 +13,8 @@ interface AnalysisFiltersProps {
   analysis: AnalysisResult;
   filters: FilterState;
   reviews: ReviewRecordMap;
+  selectedCount: number;
+  totalCount: number;
   onChange: (filters: FilterState) => void;
 }
 
@@ -24,9 +26,8 @@ interface ActiveChip {
   remove: () => void;
 }
 
-export function AnalysisFilters({ analysis, filters, reviews, onChange }: AnalysisFiltersProps) {
-  const options = buildFilterOptions(analysis, filters, reviews);
-  const selectedCount = filterProjectKeys(analysis, reviews, filters).size;
+export function AnalysisFilters({ analysis, filters, reviews, selectedCount, totalCount, onChange }: AnalysisFiltersProps) {
+  const options = useMemo(() => buildFilterOptions(analysis, filters, reviews), [analysis, filters, reviews]);
 
   function setArray(key: ArrayFilterKey, values: string[]) {
     const next = { ...filters, [key]: values } as FilterState;
@@ -43,7 +44,7 @@ export function AnalysisFilters({ analysis, filters, reviews, onChange }: Analys
   }
 
   function setCustom(field: string, values: string[]) {
-    const customValues = { ...filters.customValues };
+    const customValues = Object.assign(Object.create(null) as Record<string, string[]>, filters.customValues);
     if (values.length) customValues[field] = values;
     else delete customValues[field];
     onChange({ ...filters, customValues });
@@ -67,7 +68,7 @@ export function AnalysisFilters({ analysis, filters, reviews, onChange }: Analys
   if (filters.amountMaxWan !== null) chips.push({ key: 'amountMaxWan', label: `金额上限：${filters.amountMaxWan.toLocaleString()}万元`, remove: () => onChange({ ...filters, amountMaxWan: null }) });
   for (const [field, values] of Object.entries(filters.customValues)) {
     for (const value of values) chips.push({
-      key: `custom:${field}:${value}`,
+      key: JSON.stringify(['custom', field, value]),
       label: `${field}：${value}`,
       remove: () => setCustom(field, values.filter((item) => item !== value))
     });
@@ -78,7 +79,7 @@ export function AnalysisFilters({ analysis, filters, reviews, onChange }: Analys
       <label className="filter-search"><Search size={15} aria-hidden="true" /><span className="visually-hidden">搜索项目</span>
         <input type="search" aria-label="搜索项目" value={filters.query} placeholder="搜索项目、客户、编码或自定义字段" onChange={(event) => onChange({ ...filters, query: event.target.value })} />
       </label>
-      <strong aria-live="polite">当前筛选 {selectedCount} / 全部 {analysis.rows.length} 个项目</strong>
+      <strong aria-live="polite">当前筛选 {selectedCount} / 全部 {totalCount} 个项目</strong>
       <button type="button" className="filter-clear" onClick={() => onChange(EMPTY_FILTERS)} disabled={chips.length === 0}>清除全部筛选</button>
     </div>
 
@@ -100,7 +101,7 @@ export function AnalysisFilters({ analysis, filters, reviews, onChange }: Analys
       <FilterGroup title="区域" fieldLabel="区域" stateKey="regions" options={options.regions} selected={filters.regions} onToggle={(value) => toggleArray('regions', value)} onAll={() => setArray('regions', options.regions.map((item) => item.value))} onClear={() => setArray('regions', [])} />
       <FilterGroup title="项目类型" fieldLabel="项目类型" stateKey="projectTypes" options={options.projectTypes} selected={filters.projectTypes} onToggle={(value) => toggleArray('projectTypes', value)} onAll={() => setArray('projectTypes', options.projectTypes.map((item) => item.value))} onClear={() => setArray('projectTypes', [])} />
       <FilterGroup title="项目等级" fieldLabel="项目等级" stateKey="projectLevels" options={options.projectLevels} selected={filters.projectLevels} onToggle={(value) => toggleArray('projectLevels', value)} onAll={() => setArray('projectLevels', options.projectLevels.map((item) => item.value))} onClear={() => setArray('projectLevels', [])} />
-      {Object.entries(options.customFields).map(([field, values]) => <CustomFilterGroup key={field} field={field} values={values} selected={filters.customValues[field] ?? []} onChange={(next) => setCustom(field, next)} />)}
+      {Object.entries(options.customFields).map(([field, values]) => <CustomFilterGroup key={field} field={field} values={values} selected={Object.prototype.hasOwnProperty.call(filters.customValues, field) ? filters.customValues[field] : []} onChange={(next) => setCustom(field, next)} />)}
     </div>
 
     {chips.length > 0 && <div className="active-filters" aria-label="已选筛选条件">

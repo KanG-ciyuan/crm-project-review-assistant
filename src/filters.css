@@ -181,6 +181,11 @@
 
 .filter-chip button { display: inline-grid; place-items: center; width: 25px; height: 25px; padding: 0; border: 0; background: transparent; color: #477577; cursor: pointer; }
 
+@media (max-width: 900px) {
+  .filter-menu[open] { flex: 1 1 320px; min-width: 0; }
+  .filter-popover { position: static; box-sizing: border-box; width: min(100%, 320px); margin-top: 4px; box-shadow: none; }
+}
+
 @media (max-width: 640px) {
   .analysis-filters { padding: 13px; }
   .filter-topline { align-items: stretch; flex-direction: column; }
