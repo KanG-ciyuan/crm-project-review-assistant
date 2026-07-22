@@ -281,6 +281,10 @@ it('analyzes an arbitrary Excel workflow and keeps seller filters, findings, met
     new File([bytes], '企业机会台账.xlsx', { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
   );
 
+  const sourceInput = screen.getByLabelText('数据来源标识（企业/账套）');
+  expect(sourceInput).toHaveValue('企业机会台账');
+  await user.clear(sourceInput);
+  await user.type(sourceInput, '华东企业 CRM');
   expect(await screen.findByRole('heading', { name: '确认表头行' })).toBeInTheDocument();
   await user.click(screen.getByRole('button', { name: '确认表头行' }));
 
@@ -332,8 +336,9 @@ it('analyzes an arbitrary Excel workflow and keeps seller filters, findings, met
   expect(report).not.toContain('乙方正常商机');
 });
 
-it('keeps review decisions for the same project isolated by workbook file name', async () => {
+it('isolates review decisions by confirmed data source instead of file name', async () => {
   const user = userEvent.setup();
+  window.localStorage.clear();
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([
     ['项目编号', '项目名称', '储备金额'],
@@ -343,8 +348,12 @@ it('keeps review decisions for the same project isolated by workbook file name',
 
   render(<App />);
   const input = screen.getByLabelText('选择 .xlsx 文件');
-  const analyze = async (fileName: string, content: string) => {
-    await user.upload(input, new File([content], fileName));
+  const setSource = async (source: string) => {
+    const sourceInput = screen.getByLabelText('数据来源标识（企业/账套）');
+    await user.clear(sourceInput);
+    await user.type(sourceInput, source);
+  };
+  const analyze = async () => {
     await user.click(await screen.findByRole('button', { name: '确认表头行' }));
     await user.click(screen.getByRole('button', { name: '确认字段关系' }));
     await user.selectOptions(screen.getByLabelText('统一金额单位'), '万元');
@@ -352,14 +361,47 @@ it('keeps review decisions for the same project isolated by workbook file name',
     await user.click(screen.getByRole('button', { name: '开始规则分析' }));
   };
 
-  await analyze('来源甲.xlsx', 'first');
+  await user.upload(input, new File(['first'], '同名项目台账.xlsx'));
+  await setSource('客户甲 CRM账套');
+  await analyze();
   const firstReview = screen.getByLabelText('SAME-1 审查状态');
   await user.selectOptions(firstReview, '已忽略');
   expect(firstReview).toHaveValue('已忽略');
 
-  await analyze('来源甲.xlsx', 'repeat');
+  await user.upload(input, new File(['second'], '同名项目台账.xlsx'));
+  await setSource('客户乙 CRM账套');
+  await analyze();
+  expect(screen.getByLabelText('SAME-1 审查状态')).toHaveValue('待复核');
+
+  await setSource('客户甲 CRM账套');
+  expect(screen.queryByRole('heading', { name: '数据质量待复核' })).not.toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: '确认表头行' })).toBeInTheDocument();
+  await analyze();
   expect(screen.getByLabelText('SAME-1 审查状态')).toHaveValue('已忽略');
 
-  await analyze('来源乙.xlsx', 'second');
-  expect(screen.getByLabelText('SAME-1 审查状态')).toHaveValue('待复核');
+  await user.upload(input, new File(['renamed'], '已改名台账.xlsx'));
+  await setSource('客户甲 CRM账套');
+  await analyze();
+  expect(screen.getByLabelText('SAME-1 审查状态')).toHaveValue('已忽略');
+});
+
+it('requires a nonblank confirmed data source before opening the import wizard', async () => {
+  const user = userEvent.setup();
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([
+    ['项目名称'],
+    ['医院数字化']
+  ]), '商机表');
+  vi.spyOn(workbookApi, 'inspectWorkbook').mockResolvedValue({ workbook, sheetNames: ['商机表'] });
+
+  render(<App />);
+  await user.upload(screen.getByLabelText('选择 .xlsx 文件'), new File(['content'], '某企业台账.xlsx'));
+  const sourceInput = screen.getByLabelText('数据来源标识（企业/账套）');
+  expect(sourceInput).toHaveValue('某企业台账');
+  expect(screen.getByText('同一企业或 CRM 账套每次重导请保持一致；不同企业或账套必须使用不同标识。')).toBeInTheDocument();
+
+  await user.clear(sourceInput);
+
+  expect(screen.getByRole('alert')).toHaveTextContent('请填写数据来源标识后继续导入。');
+  expect(screen.queryByRole('heading', { name: '确认表头行' })).not.toBeInTheDocument();
 });

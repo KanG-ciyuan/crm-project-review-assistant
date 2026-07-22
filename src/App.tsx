@@ -11,9 +11,12 @@ import { createReviewReport, formatLocalDate } from './domain/report';
 import { loadReviewRecords, reconcileReviewRecords, saveReviewRecords, updateReviewRecord, type ReviewRecordMap, type ReviewStatus } from './domain/review';
 import { inspectSheet, inspectWorkbook, type WorkbookInspection } from './lib/workbook';
 
+const suggestedSourceNamespace = (fileName: string) => fileName.replace(/\.xlsx$/i, '').trim();
+
 export default function App() {
   const [inspection, setInspection] = useState<WorkbookInspection | null>(null);
   const [fileName, setFileName] = useState('');
+  const [sourceNamespace, setSourceNamespace] = useState('');
   const [sheetName, setSheetName] = useState('');
   const [importRevision, setImportRevision] = useState(0);
   const [importReady, setImportReady] = useState<ImportReadyPayload | null>(null);
@@ -42,6 +45,7 @@ export default function App() {
     () => analysis ? createReviewReport(analysis, reviewRecords, new Date()) : '',
     [analysis, reviewRecords]
   );
+  const confirmedSourceNamespace = sourceNamespace.trim();
 
   useEffect(() => {
     setCurrentReport(generatedCurrentReport);
@@ -55,17 +59,20 @@ export default function App() {
       setFilters(EMPTY_FILTERS);
       setImportReady(null);
       setCurrentReport('');
+      setSourceNamespace('');
       const next = await inspectWorkbook(file);
       setImportRevision((current) => current + 1);
       setInspection(next);
       setSheetName(next.sheetNames[0]);
       setFileName(file.name);
+      setSourceNamespace(suggestedSourceNamespace(file.name));
     } catch (caught) {
       setInspection(null);
       setFilters(EMPTY_FILTERS);
       setImportReady(null);
       setSheetName('');
       setFileName('');
+      setSourceNamespace('');
       setError(caught instanceof Error ? caught.message : '文件读取失败，请重新选择文件');
     }
   }
@@ -94,6 +101,11 @@ export default function App() {
     setAnalysis(null);
     setFilters(EMPTY_FILTERS);
     setCurrentReport('');
+  }
+
+  function changeSourceNamespace(value: string) {
+    setSourceNamespace(value);
+    clearImportedAnalysis();
   }
 
   function changeReview(projectId: string, patch: { status?: ReviewStatus; note?: string }) {
@@ -139,6 +151,7 @@ export default function App() {
       <div className="brand"><div className="brand-mark">CR</div><div><strong>CRM 项目运营复盘</strong><span>储备项目分析助手</span></div></div>
       <div className="side-section"><p className="side-label">导入 Excel</p><label className="upload-button"><Upload size={16} /> 选择 .xlsx 文件<input className="visually-hidden-file" aria-label="选择 .xlsx 文件" type="file" accept=".xlsx" onChange={(event) => onFileChange(event.target.files?.[0] ?? null)} /></label>
         {fileName && <div className="file-state"><FileSpreadsheet size={17} /><div><b>{fileName}</b><span>{importReady?.rows.length ?? '待确认'} 条项目记录</span></div></div>}
+        {fileName && <label className="source-namespace"><span>数据来源标识（企业/账套）</span><input required aria-label="数据来源标识（企业/账套）" aria-invalid={!confirmedSourceNamespace} value={sourceNamespace} onChange={(event) => changeSourceNamespace(event.target.value)} /><small>同一企业或 CRM 账套每次重导请保持一致；不同企业或账套必须使用不同标识。</small></label>}
         {error && <p className="error">{error}</p>}
       </div>
       {inspection && <div className="side-section"><p className="side-label">工作表</p><select aria-label="工作表" value={sheetName} onChange={(event) => { setSheetName(event.target.value); setImportReady(null); setAnalysis(null); setFilters(EMPTY_FILTERS); setCurrentReport(''); }}>{inspection.sheetNames.map((name) => <option key={name}>{name}</option>)}</select>
@@ -152,7 +165,8 @@ export default function App() {
     <main className="content">
       <header><div><h1>储备项目运营复盘助手</h1><p>以固定规则发现数据质量问题和经营风险，最终结论由业务人员确认。</p></div></header>
       {!inspection && <section className="empty import-guide"><FileSpreadsheet size={36} /><h2>上传 CRM 储备项目表</h2><p>支持未加密的 .xlsx 文件，可在导入向导中确认表头、字段关系和业务口径。</p><a className="sample-download" href="/CRM历史项目表-脱敏适配样表.xlsx" download><Download size={15} /> 下载脱敏示例表</a></section>}
-      {sheetInspection && <ImportWizard key={`${importRevision}:${fileName}:${sheetName}`} inspection={sheetInspection} sourceNamespace={fileName} onReady={startAnalysis} onConfigurationChange={clearImportedAnalysis} />}
+      {sheetInspection && !confirmedSourceNamespace && <section className="notice" role="alert"><h2>需要数据来源标识</h2><p>请填写数据来源标识后继续导入。</p></section>}
+      {sheetInspection && confirmedSourceNamespace && <ImportWizard key={`${importRevision}:${fileName}:${sheetName}:${sourceNamespace}`} inspection={sheetInspection} sourceNamespace={confirmedSourceNamespace} onReady={startAnalysis} onConfigurationChange={clearImportedAnalysis} />}
       {analysis && visibleAnalysis && <>
         <AnalysisFilters analysis={analysis} filters={filters} reviews={reviewRecords} selectedCount={selectedKeys.size} totalCount={analysis.rows.length} onChange={setFilters} />
         <AnalysisResults analysis={visibleAnalysis} reviews={reviewRecords} onChangeReview={changeReview} />

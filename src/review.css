@@ -113,6 +113,31 @@
   line-height: 1.5;
 }
 
+.source-namespace {
+  color: #eaf4f3;
+  display: grid;
+  font-size: 11px;
+  gap: 6px;
+  margin-top: 14px;
+}
+
+.source-namespace input {
+  background: #fff;
+  border: 1px solid rgba(255, 255, 255, .32);
+  color: #17252b;
+  padding: 9px;
+  width: 100%;
+}
+
+.source-namespace input[aria-invalid="true"] {
+  border-color: #ff9e98;
+}
+
+.source-namespace small {
+  color: #b6d1cf;
+  line-height: 1.5;
+}
+
 .threshold input:disabled {
   cursor: not-allowed;
   opacity: .7;

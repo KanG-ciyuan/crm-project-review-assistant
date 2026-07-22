@@ -194,7 +194,7 @@ describe('field mappings', () => {
       { 编号: '', 项目: '无编号二' },
       { 编号: 'DUP-1', 项目: '重复一' },
       { 编号: 'DUP-1', 项目: '重复二' }
-    ], mappings, emptyValueMappings, '商机明细', '客户甲台账.xlsx');
+    ], mappings, emptyValueMappings, '商机明细', '客户甲CRM账套');
 
     expect(new Set(rows.map((row) => row.sourceKey)).size).toBe(4);
     expect(rows[0].sourceKey).not.toBe(rows[1].sourceKey);
@@ -206,6 +206,7 @@ describe('field mappings', () => {
     const east = applyMappings([{ 编号: 'A-1' }], mappings, emptyValueMappings, '华东商机');
     const west = applyMappings([{ 编号: 'A-1' }], mappings, emptyValueMappings, '华西商机');
 
+    expect(east[0].sourceKey).toMatch(/^sheet:/);
     expect(east[0].sourceKey).not.toBe(west[0].sourceKey);
   });
 
@@ -217,15 +218,15 @@ describe('field mappings', () => {
     expect(spaced[0].sourceKey).not.toBe(hyphenated[0].sourceKey);
   });
 
-  it('isolates the same sheet and project ID across workbook source namespaces', () => {
+  it('isolates confirmed data sources while keeping the same source stable across row moves', () => {
     const mappings: ColumnMapping[] = [{ sourceHeader: '编号', mode: 'standard', targetField: 'projectId' }];
-    const first = applyMappings([{ 编号: 'A-1' }, { 编号: 'B-2' }], mappings, emptyValueMappings, '商机明细', '客户甲 台账.xlsx');
-    const repeated = applyMappings([{ 编号: 'B-2' }, { 编号: 'A-1' }], mappings, emptyValueMappings, '商机明细', '客户甲 台账.xlsx');
-    const second = applyMappings([{ 编号: 'A-1' }], mappings, emptyValueMappings, '商机明细', '客户乙-台账.xlsx');
+    const first = applyMappings([{ 编号: 'A-1' }, { 编号: 'B-2' }], mappings, emptyValueMappings, '商机明细', '客户甲 CRM账套');
+    const repeated = applyMappings([{ 编号: 'B-2' }, { 编号: 'A-1' }], mappings, emptyValueMappings, '商机明细', '客户甲 CRM账套');
+    const second = applyMappings([{ 编号: 'A-1' }], mappings, emptyValueMappings, '商机明细', '客户乙-CRM账套');
 
     expect(first[0].sourceKey).toBe(repeated[1].sourceKey);
     expect(first[0].sourceKey).not.toBe(second[0].sourceKey);
-    expect(first[0].sourceKey).toContain(encodeURIComponent('客户甲 台账.xlsx'));
+    expect(first[0].sourceKey).toContain(encodeURIComponent('客户甲 CRM账套'));
     expect(first[0].sourceKey).toContain(encodeURIComponent('商机明细'));
   });
 
