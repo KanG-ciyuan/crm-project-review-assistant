@@ -83,7 +83,7 @@ describe('workbook helpers', () => {
     expect(findHeaderRow(matrix)).toBe(2);
     expect(matrix.slice(3).filter((row) => row.some((cell) => cell !== null && cell !== '')).length).toBe(30);
     const parsed = parseSelectedSheet(workbook, '项目明细（标准导入）');
-    expect(parsed.rows.find((row) => row.projectId === 'P-2026-024')?.probabilityBand).toBe('中等概率');
+    expect(parsed.rows.find((row) => row.projectId === 'P-2026-024')?.probabilityBand).toBe('60%');
   });
 
   it('recognizes CRM history headers and normalizes confirmed business fields', () => {
@@ -100,7 +100,7 @@ describe('workbook helpers', () => {
 
     expect(parsed.profile).toBe('crm-history');
     expect(parsed.validation.valid).toBe(true);
-    expect(parsed.rows[0]).toMatchObject({ projectId: 'CRM-001', unit: '万元', probabilityBand: '低概率', sourceKey: 'crm-history:1', customFields: { '拜访间隔周期（天）': 31 } });
-    expect(parsed.rows[1]).toMatchObject({ projectId: '', projectName: '', status: '呆滞', probabilityBand: '临近签约' });
+    expect(parsed.rows[0]).toMatchObject({ projectId: 'CRM-001', unit: '万元', probabilityBand: '未知', sourceKey: 'crm-history:1', customFields: { '拜访间隔周期（天）': 31 } });
+    expect(parsed.rows[1]).toMatchObject({ projectId: '', projectName: '', status: '呆滞', probabilityBand: '未知' });
   });
 });

@@ -1,4 +1,4 @@
-import { amountInWan, daysBetween, projectKey, type CanonicalFieldKey, type ProjectRow } from './project';
+import { amountInWan, daysBetween, probabilityPercent, projectKey, type CanonicalFieldKey, type ProjectRow } from './project';
 import type { Finding, FindingCategory } from './rules';
 
 export interface AnalysisOverview {
@@ -59,8 +59,6 @@ const RESERVE_BUCKETS = [
   { name: '超过365天', min: 366, max: Number.POSITIVE_INFINITY }
 ];
 
-const PROBABILITY_ORDER = ['询价类', '低概率', '中等概率', '较高概率', '临近签约', '未知'];
-
 function strictDate(value: string | null): Date | null {
   if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
   const [year, month, day] = value.split('-').map(Number);
@@ -101,14 +99,22 @@ function dateBuckets(rows: ProjectRow[], field: 'lastFollowUpAt' | 'createdAt', 
 }
 
 function probabilityBreakdown(rows: ProjectRow[]): BreakdownItem[] {
-  const groups = new Map(PROBABILITY_ORDER.map((name) => [name, { name, projectCount: 0, amountWan: 0 }]));
+  const groups = new Map<string, BreakdownItem>();
   for (const row of rows) {
-    const name = PROBABILITY_ORDER.includes(row.probabilityBand) ? row.probabilityBand : '未知';
-    const item = groups.get(name)!;
+    const name = row.probabilityBand;
+    const item = groups.get(name) ?? { name, projectCount: 0, amountWan: 0 };
     item.projectCount += 1;
     item.amountWan += amountFor(row);
+    groups.set(name, item);
   }
-  return PROBABILITY_ORDER.map((name) => groups.get(name)!);
+  return [...groups.values()].sort((left, right) => {
+    if (left.name === '询价类') return -1;
+    if (right.name === '询价类') return 1;
+    if (left.name === '未知') return 1;
+    if (right.name === '未知') return -1;
+    return (probabilityPercent(left.name as ProjectRow['probabilityBand']) ?? 101)
+      - (probabilityPercent(right.name as ProjectRow['probabilityBand']) ?? 101);
+  });
 }
 
 function constructAnalysis(rows: ProjectRow[], findings: Finding[], today: Date, generatedAt = today.toISOString(), mappedFields = ALL_CANONICAL_FIELDS): AnalysisResult {

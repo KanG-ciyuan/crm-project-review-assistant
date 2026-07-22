@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Search, X } from 'lucide-react';
 import type { AnalysisResult } from '../domain/analysis';
 import {
@@ -129,14 +129,16 @@ function FilterGroup({ title, fieldLabel, stateKey, options, selected, onToggle,
   onOnly?: (value: string) => void;
   extra?: React.ReactNode;
 }) {
-  return <details className="filter-menu">
+  const [open, setOpen] = useState(false);
+  const applyAndClose = (action: () => void) => { action(); setOpen(false); };
+  return <details className="filter-menu" open={open} onToggle={(event) => setOpen(event.currentTarget.open)}>
     <summary>{title}{selected.length > 0 && <b>{selected.length}</b>}</summary>
     <div className="filter-popover" role="group" aria-label={`${fieldLabel}筛选选项`}>
-      <div className="filter-menu-actions"><button type="button" onClick={onAll}>全选{fieldLabel}</button><button type="button" onClick={onClear}>清空{fieldLabel}</button></div>
+      <div className="filter-menu-actions"><button type="button" onClick={() => applyAndClose(onAll)}>全选{fieldLabel}</button><button type="button" onClick={() => applyAndClose(onClear)}>清空{fieldLabel}</button></div>
       <div className="filter-options">
         {options.length === 0 ? <p>暂无可选项</p> : options.map((option) => <div className="filter-option" key={option.value}>
-          <label><input type="checkbox" name={stateKey} checked={selected.includes(option.value)} onChange={() => onToggle(option.value)} /><span>{option.value} {option.count}个项目</span></label>
-          {onOnly && <button type="button" className="only-option" aria-label={`只看${option.value}`} onClick={() => onOnly(option.value)}>只看</button>}
+          <label><input type="checkbox" name={stateKey} checked={selected.includes(option.value)} onChange={() => applyAndClose(() => onToggle(option.value))} /><span>{option.value} {option.count}个项目</span></label>
+          {onOnly && <button type="button" className="only-option" aria-label={`只看${option.value}`} onClick={() => applyAndClose(() => onOnly(option.value))}>只看</button>}
         </div>)}
       </div>
       {extra}
@@ -145,12 +147,14 @@ function FilterGroup({ title, fieldLabel, stateKey, options, selected, onToggle,
 }
 
 function CustomFilterGroup({ field, values, selected, onChange }: { field: string; values: string[]; selected: string[]; onChange: (values: string[]) => void }) {
-  return <details className="filter-menu">
+  const [open, setOpen] = useState(false);
+  const applyAndClose = (next: string[]) => { onChange(next); setOpen(false); };
+  return <details className="filter-menu" open={open} onToggle={(event) => setOpen(event.currentTarget.open)}>
     <summary>{field}{selected.length > 0 && <b>{selected.length}</b>}</summary>
     <div className="filter-popover" role="group" aria-label={`${field}筛选选项`}>
-      <div className="filter-menu-actions"><button type="button" onClick={() => onChange(values)}>全选{field}</button><button type="button" onClick={() => onChange([])}>清空{field}</button></div>
+      <div className="filter-menu-actions"><button type="button" onClick={() => applyAndClose(values)}>全选{field}</button><button type="button" onClick={() => applyAndClose([])}>清空{field}</button></div>
       <div className="filter-options">{values.map((value) => <label className="filter-option custom-option" key={value}>
-        <input type="checkbox" checked={selected.includes(value)} aria-label={`${field}：${value}`} onChange={() => onChange(selected.includes(value) ? selected.filter((item) => item !== value) : [...selected, value])} />
+        <input type="checkbox" checked={selected.includes(value)} aria-label={`${field}：${value}`} onChange={() => applyAndClose(selected.includes(value) ? selected.filter((item) => item !== value) : [...selected, value])} />
         <span>{value}</span>
       </label>)}</div>
     </div>

@@ -72,34 +72,30 @@ function FindingTable({ groups, reviews, onChangeReview, controlScope }: {
 }) {
   if (groups.length === 0) return <p className="no-issues">本次分析没有发现此类项目。</p>;
 
-  return <div className="table-scroll"><table><thead><tr>
-    <th>项目编号</th><th>项目名称</th><th>客户</th><th>部门 / 负责人</th><th>储备金额</th><th>规则标签与说明</th><th>处理状态</th><th>处理说明</th>
+  return <div className="table-scroll finding-table-wrap"><table className="finding-table"><thead><tr>
+    <th>项目摘要</th><th>部门 / 负责人</th><th>金额</th><th>发现的问题</th><th>审查处理</th>
   </tr></thead><tbody>{groups.map((group) => {
     const needsReview = group.findings.some((finding) => finding.level !== 'info');
     const review = reviews[group.reviewKey];
     const latestHistory = review?.history[review.history.length - 1];
     const projectLabel = group.projectId || group.projectName || group.reviewKey;
     return <tr key={group.reviewKey}>
-      <td>{group.projectId || '未填写'}</td>
-      <td>{group.projectName || '未填写项目名称'}</td>
-      <td>{group.customerName || '未填写'}</td>
-      <td>{group.department || '未填写'} / {group.salesManager || '未填写'}</td>
-      <td>{group.amountWan === null ? '—' : `${formatAmount(group.amountWan)} 万`}</td>
-      <td><div className="finding-stack">{group.findings.map((finding, index) => <div key={`${finding.ruleId}:${finding.relationKey ?? ''}:${finding.label}:${index}`}>
-        <span className={`tag finding-${finding.level}`}>{finding.label}</span><span>{finding.reason}</span>
+      <td data-label="项目摘要"><div className="project-summary"><strong>{group.projectName || '未填写项目名称'}</strong><span>{group.projectId || '未填写编号'}</span><span>{group.customerName || '未填写客户'}</span></div></td>
+      <td data-label="部门 / 负责人"><div className="owner-summary"><span>{group.department || '未填写部门'}</span><strong>{group.salesManager || '未填写负责人'}</strong></div></td>
+      <td data-label="金额" className="amount-cell">{group.amountWan === null ? '—' : `${formatAmount(group.amountWan)} 万`}</td>
+      <td data-label="发现的问题"><div className="finding-stack">{group.findings.map((finding, index) => <div className="finding-item" key={`${finding.ruleId}:${finding.relationKey ?? ''}:${finding.label}:${index}`}>
+        <span className={`tag finding-${finding.level}`}>{finding.label}</span><p>{finding.reason}</p>
       </div>)}</div></td>
-      <td>{needsReview ? <div className="review-control">
+      <td data-label="审查处理"><div className="review-cell">{needsReview ? <div className="review-control">
         <label className="visually-hidden" htmlFor={`review-${controlScope}-${group.reviewKey}`}>{projectLabel} 审查状态</label>
         <select id={`review-${controlScope}-${group.reviewKey}`} aria-label={`${projectLabel} 审查状态`} value={review?.status ?? '待复核'} onChange={(event) => onChangeReview(group.reviewKey, { status: event.target.value as ReviewStatus })}>
           {REVIEW_STATUSES.map((status) => <option key={status}>{status}</option>)}
         </select>
         {review?.dataUpdated && <small className="review-updated">数据已更新，待复核</small>}
-      </div> : <span className="information-state">经营观察</span>}</td>
-      <td>{needsReview ? <div className="review-control">
         <label className="visually-hidden" htmlFor={`note-${controlScope}-${group.reviewKey}`}>{projectLabel} 处理说明</label>
         <input id={`note-${controlScope}-${group.reviewKey}`} aria-label={`${projectLabel} 处理说明`} value={review?.note ?? ''} maxLength={120} placeholder="填写处理说明（可选）" onChange={(event) => onChangeReview(group.reviewKey, { note: event.target.value })} />
         {latestHistory && <small className="review-history">历史：{latestHistory.status}，{latestHistory.note || '无说明'}</small>}
-      </div> : <span className="information-state">无需审核</span>}</td>
+      </div> : <><span className="information-state">经营观察</span><small className="review-history">无需审核</small></>}</div></td>
     </tr>;
   })}</tbody></table></div>;
 }

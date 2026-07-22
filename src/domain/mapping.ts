@@ -37,18 +37,18 @@ export const emptyValueMappings: ValueMappings = {
 };
 
 const FIELD_ALIASES: Record<CanonicalFieldKey, readonly string[]> = {
-  projectId: ['项目编号', '项目编码', '商机编号', '商机编码', '机会编号', 'project id', 'project code'],
-  projectName: ['项目名称', '商机名称', '项目标题', '商机标题', '机会名称', 'project name', 'opportunity name'],
-  customerName: ['客户', '客户名称', '客户单位', '客户/单位', '单位名称', '企业名称', 'customer', 'customer name'],
-  department: ['部门', '所属部门', '业务部门', '销售部门', '组织', 'department'],
-  salesManager: ['销售经理', '业务负责人', '销售负责人', '项目负责人', '商机负责人', '负责人', 'owner', 'sales owner'],
-  status: ['项目状态', '商机状态', '机会状态', '状态', 'project status', 'opportunity status'],
-  amount: ['储备金额', '储备金额(万元)', '储备金额（万元）', '商机金额', '项目金额', '预计金额', '合同金额', '报价金额', '金额', 'amount'],
+  projectId: ['项目编号', '项目编码', '商机编号', '商机编码', '机会编号', '机会主键', 'project id', 'project code'],
+  projectName: ['项目名称', '商机名称', '项目标题', '商机标题', '机会名称', '机会主题', 'project name', 'opportunity name'],
+  customerName: ['客户', '客户名称', '客户单位', '客户/单位', '单位名称', '企业名称', '客户主体', 'customer', 'customer name'],
+  department: ['部门', '所属部门', '业务部门', '销售部门', '组织', '负责团队', 'department'],
+  salesManager: ['销售经理', '业务负责人', '销售负责人', '项目负责人', '商机负责人', '业务人员', '负责人姓名', '负责人', 'owner', 'sales owner'],
+  status: ['项目状态', '商机状态', '机会状态', '推进阶段', '内部阶段', '状态', 'project status', 'opportunity status'],
+  amount: ['储备金额', '储备金额(万元)', '储备金额（万元）', '商机金额', '项目金额', '预计金额', '预计规模', '合同金额', '报价金额', '金额', 'amount'],
   unit: ['金额单位', '金额量纲', 'amount unit'],
-  createdAt: ['创建日期', '创建时间', '项目创建日期', '商机创建日期', '立项日期', 'created at', 'creation date'],
-  lastFollowUpAt: ['最近跟进日期', '最近跟进时间', '最后跟进时间', '最后联系时间', '最近联系时间', '最近拜访日期', '最近拜访时间', 'last follow up', 'last contact time'],
-  expectedSignAt: ['预计签约日期', '预计签订日期', '预计成交时间', '预计成交日期', '预计合同签订时间', '预计合同签订日期', 'expected close date', 'expected sign date'],
-  probabilityBand: ['成单概率', '成交概率', '商机概率', '赢单概率', '概率', 'probability', 'win probability'],
+  createdAt: ['创建日期', '创建时间', '项目创建日期', '商机创建日期', '立项日期', '登记时间', 'created at', 'creation date'],
+  lastFollowUpAt: ['最近跟进日期', '最近跟进时间', '最后跟进时间', '最后联系时间', '最近联系时间', '最近拜访日期', '最近拜访时间', '末次联系', 'last follow up', 'last contact time'],
+  expectedSignAt: ['预计签约日期', '预计签订日期', '预计成交时间', '预计成交日期', '预计合同签订时间', '预计合同签订日期', '计划成交日', 'expected close date', 'expected sign date'],
+  probabilityBand: ['成单概率', '成交概率', '商机概率', '赢单概率', '成功可能性', '概率', 'probability', 'win probability'],
   industry: ['行业', '所属行业', '客户行业', 'industry'],
   region: ['区域', '区域/省份', '省份', '地区', '销售区域', 'region'],
   projectType: ['项目类型', '商机类型', '业务类型', '机会类型', 'project type'],
@@ -80,7 +80,8 @@ export function suggestMappings(headers: string[]): ColumnMapping[] {
 }
 
 const validStatuses = new Set<ProjectStatus>(['跟进中', '呆滞', '已签约', '已丢单', '未知']);
-const validProbabilities = new Set<ProbabilityBand>(['询价类', '低概率', '中等概率', '较高概率', '临近签约', '未知']);
+const validProbability = (value: string): value is ProbabilityBand =>
+  value === '询价类' || value === '未知' || /^(?:100|\d{1,2})(?:\.\d+)?%$/.test(value);
 const validUnits = new Set(['元', '万元', '亿元']);
 
 export function validateMappings(mappings: ColumnMapping[], values: ValueMappings): MappingValidation {
@@ -122,7 +123,7 @@ export function validateMappings(mappings: ColumnMapping[], values: ValueMapping
     if (!source.trim() || !validStatuses.has(status)) unmappedEnumValues.push(source || '空状态值');
   }
   for (const [source, probability] of Object.entries(values.probabilities)) {
-    if (!source.trim() || !validProbabilities.has(probability)) unmappedEnumValues.push(source || '空概率值');
+    if (!source.trim() || !validProbability(probability)) unmappedEnumValues.push(source || '空概率值');
   }
 
   return {
@@ -183,24 +184,23 @@ const toStatus = (value: unknown, values: ValueMappings): ProjectStatus => {
   return validStatuses.has(source as ProjectStatus) ? source as ProjectStatus : '未知';
 };
 
+export const parseProbability = (value: unknown): ProbabilityBand => {
+  const source = toText(value);
+  if (!source) return '未知';
+  if (source === '询价类' || source === '询价') return '询价类';
+  if (/^(?:100|\d{1,2})(?:\.\d+)?%$/.test(source)) return source as ProbabilityBand;
+  const numeric = Number(source);
+  if (!Number.isFinite(numeric) || numeric < 0 || numeric > 100 || numeric === 1) return '未知';
+  const percent = numeric > 0 && numeric < 1 ? numeric * 100 : numeric;
+  return `${Number(percent.toFixed(4))}%` as ProbabilityBand;
+};
+
 const toProbability = (value: unknown, values: ValueMappings): ProbabilityBand => {
   const source = toText(value);
   if (!source) return '未知';
   const mapped = mappedValue(source, values.probabilities);
   if (mapped) return mapped;
-  if (validProbabilities.has(source as ProbabilityBand)) return source as ProbabilityBand;
-  if (source === '1%-50%' || source === '1-50%') return '低概率';
-  if (source === '51%-70%' || source === '51-70%') return '中等概率';
-  if (source === '71%-80%' || source === '71-80%') return '较高概率';
-  if (source === '81%-100%' || source === '81-100%') return '临近签约';
-  const numeric = Number(source.replace('%', ''));
-  if (!Number.isFinite(numeric) || numeric < 0) return '未知';
-  const percent = numeric > 0 && numeric <= 1 ? numeric * 100 : numeric;
-  if (percent <= 50) return '低概率';
-  if (percent <= 70) return '中等概率';
-  if (percent <= 80) return '较高概率';
-  if (percent <= 100) return '临近签约';
-  return '未知';
+  return parseProbability(value);
 };
 
 const toUnit = (value: unknown): ProjectRow['unit'] => {

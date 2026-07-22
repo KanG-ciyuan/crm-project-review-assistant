@@ -19,7 +19,7 @@ const row = makeProject({
   createdAt: '2026-05-18',
   lastFollowUpAt: '2026-07-14',
   expectedSignAt: '2026-11-20',
-  probabilityBand: '中等概率'
+  probabilityBand: '60%'
 });
 
 function memoryStorage() {

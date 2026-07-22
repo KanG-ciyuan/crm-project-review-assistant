@@ -27,6 +27,19 @@ function FilterHarness({ initial = EMPTY_FILTERS }: { initial?: FilterState }) {
 }
 
 describe('AnalysisFilters', () => {
+  it('closes the active menu after applying a selection and keeps the active chip', async () => {
+    const user = userEvent.setup();
+    render(<FilterHarness />);
+
+    const departmentMenu = screen.getByText('部门').closest('details')!;
+    await user.click(screen.getByText('部门'));
+    expect(departmentMenu).toHaveAttribute('open');
+    await user.click(screen.getByRole('checkbox', { name: '华东一部 10个项目' }));
+
+    expect(departmentMenu).not.toHaveAttribute('open');
+    expect(screen.getByText('部门：华东一部')).toBeInTheDocument();
+  });
+
   it('hides unmapped extension filters and shows a mapped-but-empty extension field', () => {
     const row = makeProject({ sourceKey: 'one', industry: '' });
     const hidden = buildAnalysis([row], [], today, ['projectName']);

@@ -1,5 +1,5 @@
 export type ProjectStatus = '跟进中' | '呆滞' | '已签约' | '已丢单' | '未知';
-export type ProbabilityBand = '询价类' | '低概率' | '中等概率' | '较高概率' | '临近签约' | '未知';
+export type ProbabilityBand = '询价类' | '未知' | `${number}%`;
 
 export type CanonicalFieldKey =
   | 'projectId' | 'projectName' | 'customerName' | 'department' | 'salesManager'
@@ -37,6 +37,12 @@ export interface ProjectRow {
 
 export const projectKey = (row: ProjectRow) =>
   row.sourceKey || row.projectId || `${row.customerName}|${row.projectName}|${row.salesManager}`;
+
+export const probabilityPercent = (value: ProbabilityBand): number | null => {
+  if (!value.endsWith('%')) return null;
+  const parsed = Number(value.slice(0, -1));
+  return Number.isFinite(parsed) && parsed >= 0 && parsed <= 100 ? parsed : null;
+};
 
 export function amountInWan(row: Pick<ProjectRow, 'amount' | 'unit'>): number | null {
   if (row.amount === null || !Number.isFinite(row.amount)) return null;

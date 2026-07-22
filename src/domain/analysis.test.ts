@@ -27,8 +27,8 @@ describe('analysis summaries', () => {
   it('builds department, seller, follow-up, reserve, probability, and amount summaries', () => {
     const today = new Date(2026, 6, 21, 12);
     const rows = [
-      makeProject({ sourceKey: 'a', department: '华东部', salesManager: '销售甲', amount: 1000, lastFollowUpAt: '2026-07-20', createdAt: '2026-07-01', probabilityBand: '中等概率' }),
-      makeProject({ sourceKey: 'b', projectId: 'B', department: '华东部', salesManager: '销售乙', amount: 5000, lastFollowUpAt: '2026-05-01', createdAt: '2025-01-01', probabilityBand: '低概率' })
+      makeProject({ sourceKey: 'a', department: '华东部', salesManager: '销售甲', amount: 1000, lastFollowUpAt: '2026-07-20', createdAt: '2026-07-01', probabilityBand: '70%' }),
+      makeProject({ sourceKey: 'b', projectId: 'B', department: '华东部', salesManager: '销售乙', amount: 5000, lastFollowUpAt: '2026-05-01', createdAt: '2025-01-01', probabilityBand: '40%' })
     ];
     const analysis = buildAnalysis(rows, evaluateRulePack(rows, today), today);
 
@@ -36,7 +36,8 @@ describe('analysis summaries', () => {
     expect(analysis.bySalesManager.map((item) => item.name)).toEqual(['销售乙', '销售甲']);
     expect(analysis.followUpBuckets.find((item) => item.name === '61天以上')?.projectCount).toBe(1);
     expect(analysis.reserveCycleBuckets.find((item) => item.name === '超过365天')?.projectCount).toBe(1);
-    expect(analysis.probabilityBreakdown.find((item) => item.name === '低概率')?.projectCount).toBe(1);
+    expect(analysis.probabilityBreakdown.find((item) => item.name === '40%')?.projectCount).toBe(1);
+    expect(analysis.probabilityBreakdown.find((item) => item.name === '70%')?.projectCount).toBe(1);
     expect(analysis.results['重点项目复盘'].find((item) => item.rowKey === 'b')?.label).toBe('超大金额待复核');
   });
 

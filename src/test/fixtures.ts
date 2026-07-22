@@ -18,7 +18,7 @@ export function makeProject(overrides: Partial<ProjectRow> = {}): ProjectRow {
     lastFollowUpAtParseError: false,
     expectedSignAt: '2026-08-01',
     expectedSignAtParseError: false,
-    probabilityBand: '中等概率',
+    probabilityBand: '60%',
     industry: '医疗',
     region: '华东',
     projectType: '数字化项目',

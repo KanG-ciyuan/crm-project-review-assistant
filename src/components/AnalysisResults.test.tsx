@@ -1,5 +1,5 @@
-import { render, screen, within } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { cleanup, render, screen, within } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { buildAnalysis } from '../domain/analysis';
 import type { Finding } from '../domain/rules';
 import type { ReviewRecordMap } from '../domain/review';
@@ -15,7 +15,21 @@ const reviews: ReviewRecordMap = {
   'row-a': { projectId: 'CRM-A', projectName: row.projectName, status: '待复核', note: '', firstReviewedAt: '2026-07-21T00:00:00.000Z', lastReviewedAt: '2026-07-21T00:00:00.000Z', fingerprint: 'x', dataUpdated: false, history: [] }
 };
 
+afterEach(cleanup);
+
 describe('AnalysisResults', () => {
+  it('uses five readable columns and stacks each label above its reason', () => {
+    render(<AnalysisResults analysis={buildAnalysis([row], findings, new Date(2026, 6, 21, 12))} reviews={reviews} onChangeReview={vi.fn()} />);
+
+    const keyProjects = screen.getByRole('region', { name: '重点项目复盘' });
+    expect(within(keyProjects).getAllByRole('columnheader').map((node) => node.textContent)).toEqual([
+      '项目摘要', '部门 / 负责人', '金额', '发现的问题', '审查处理'
+    ]);
+    const finding = within(keyProjects).getByText('超大金额待复核').closest('.finding-item');
+    expect(finding).not.toBeNull();
+    expect(within(finding as HTMLElement).getByText('金额较大')).toBeInTheDocument();
+  });
+
   it('renders five separate result areas and only asks actionable findings to be reviewed', () => {
     render(<AnalysisResults analysis={buildAnalysis([row], findings, new Date(2026, 6, 21, 12))} reviews={reviews} onChangeReview={vi.fn()} />);
 

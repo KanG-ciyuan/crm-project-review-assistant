@@ -163,11 +163,15 @@ describe('confirmed To B rule pack', () => {
   it('treats low probability and long cycles as observations rather than standalone risks', () => {
     const rows = [
       makeProject({ sourceKey: 'low', projectId: 'LOW', projectName: '询价项目', probabilityBand: '询价类', amount: 100 }),
+      makeProject({ sourceKey: 'forty', projectId: 'FORTY', projectName: '40%项目', probabilityBand: '40%', amount: 101 }),
+      makeProject({ sourceKey: 'seventy', projectId: 'SEVENTY', projectName: '70%项目', probabilityBand: '70%', amount: 102 }),
       makeProject({ sourceKey: 'long', projectId: 'LONG', projectName: '长周期项目', createdAt: '2026-01-21', amount: 100 }),
       makeProject({ sourceKey: 'term', projectId: 'TERM', projectName: '长期项目', createdAt: '2025-07-20', amount: 100 })
     ];
     const findings = evaluateRulePack(rows, today);
     expect(findings.find((item) => item.rowKey === 'low' && item.category === '经营结构分析')?.label).toBe('询价及低概率项目');
+    expect(findings.find((item) => item.rowKey === 'forty' && item.ruleId === 'probability-observation')?.reason).toContain('40%');
+    expect(findings.find((item) => item.rowKey === 'seventy' && item.ruleId === 'probability-observation')).toBeUndefined();
     expect(findings.find((item) => item.rowKey === 'long' && item.category === '经营结构分析')?.label).toBe('长周期项目');
     expect(findings.find((item) => item.rowKey === 'term' && item.category === '经营结构分析')?.label).toBe('长期储备项目');
     expect(findings.filter((item) => ['low', 'long', 'term'].includes(item.rowKey)).every((item) => item.level === 'info')).toBe(true);

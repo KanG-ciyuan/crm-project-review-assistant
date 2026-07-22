@@ -1,5 +1,6 @@
 import * as XLSX from 'xlsx';
 import type { CustomFieldValue, ProjectRow, ProjectStatus } from '../domain/project';
+import { parseProbability } from '../domain/mapping';
 
 export const REQUIRED_HEADERS = ['项目编号', '项目名称', '部门', '销售经理', '项目状态', '储备金额', '金额单位', '创建日期', '最近拜访日期', '预计签约日期', '成单概率'] as const;
 const CRM_HEADERS = ['部门', '销售经理', '创建日期', '最近拜访时间', '拜访间隔周期（天）', '项目名称', '项目编码', '项目状态', '成单概率', '储备金额（万元）', '预计合同签订时间'] as const;
@@ -62,21 +63,8 @@ const toAmount = (value: unknown): number | null => {
   return Number.isFinite(amount) ? amount : null;
 };
 
-const toProbabilityBand = (value: unknown): ProjectRow['probabilityBand'] => {
-  if (!isPresent(value)) return '未知';
-  const probability = Number(String(value).replace('%', '').trim());
-  if (!Number.isFinite(probability)) return '未知';
-  const percent = probability > 0 && probability <= 1 ? probability * 100 : probability;
-  if (percent <= 50) return '低概率';
-  if (percent <= 70) return '中等概率';
-  if (percent <= 80) return '较高概率';
-  return percent <= 100 ? '临近签约' : '未知';
-};
-
 const toText = (value: unknown): string => isPresent(value) ? String(value).trim() : '';
 const crmText = (value: unknown) => { const text = toText(value); return text === '无' ? '' : text; };
-const PROBABILITY_BANDS: Record<string, NonNullable<ProjectRow['probabilityBand']>> = { '询价类': '询价类', '1%-50%': '低概率', '51%-70%': '中等概率', '71%-80%': '较高概率', '81%-100%': '临近签约' };
-const band = (value: string): ProjectRow['probabilityBand'] => PROBABILITY_BANDS[value] ?? '未知';
 
 const pick = (source: Record<string, unknown>, header: string) => source[header];
 
@@ -163,7 +151,7 @@ export function parseSelectedSheet(workbook: XLSX.WorkBook, sheetName: string): 
     lastFollowUpAtParseError: isPresent(pick(source, '最近拜访时间')) && toDateString(pick(source, '最近拜访时间')) === null,
     expectedSignAt: toDateString(pick(source, '预计合同签订时间')),
     expectedSignAtParseError: isPresent(pick(source, '预计合同签订时间')) && toDateString(pick(source, '预计合同签订时间')) === null,
-    probabilityBand: band(crmText(pick(source, '成单概率'))), industry: crmText(pick(source, '行业')),
+    probabilityBand: parseProbability(crmText(pick(source, '成单概率'))), industry: crmText(pick(source, '行业')),
     region: crmText(pick(source, '区域')), projectType: crmText(pick(source, '项目类型')), projectLevel: crmText(pick(source, '项目等级')),
     latestUpdatedAt: null,
     customFields: {
@@ -186,7 +174,7 @@ export function parseSelectedSheet(workbook: XLSX.WorkBook, sheetName: string): 
     lastFollowUpAtParseError: isPresent(pick(source, '最近拜访日期')) && toDateString(pick(source, '最近拜访日期')) === null,
     expectedSignAt: toDateString(pick(source, '预计签约日期')),
     expectedSignAtParseError: isPresent(pick(source, '预计签约日期')) && toDateString(pick(source, '预计签约日期')) === null,
-    probabilityBand: toProbabilityBand(pick(source, '成单概率')),
+    probabilityBand: parseProbability(pick(source, '成单概率')),
     industry: toText(pick(source, '行业')),
     region: toText(pick(source, '区域/省份')),
     projectType: toText(pick(source, '项目类型')),

@@ -4,12 +4,31 @@ import { evaluateRulePack } from './rules';
 import {
   applyMappings,
   emptyValueMappings,
+  parseProbability,
   suggestMappings,
   validateMappings,
   type ColumnMapping
 } from './mapping';
 
 describe('field mappings', () => {
+  it.each([
+    [0.1, '10%'],
+    [0.9, '90%'],
+    [10, '10%'],
+    ['70%', '70%'],
+    ['询价类', '询价类'],
+    [0, '0%']
+  ])('parses %p as an exact probability', (source, expected) => {
+    expect(parseProbability(source)).toBe(expected);
+  });
+
+  it('keeps ambiguous or invalid probabilities unresolved', () => {
+    expect(parseProbability(1)).toBe('未知');
+    expect(parseProbability(101)).toBe('未知');
+    expect(parseProbability(-1)).toBe('未知');
+    expect(parseProbability('无法判断')).toBe('未知');
+  });
+
   it('preserves a non-empty unparseable amount for rule-level format review', () => {
     const rows = applyMappings(
       [{ 项目名称: '医院数改', 储备金额: '待确认' }],
@@ -119,7 +138,7 @@ describe('field mappings', () => {
       ],
       {
         statuses: { 推进中: '跟进中' },
-        probabilities: { '51%-70%': '中等概率' },
+        probabilities: { '51%-70%': '60%' },
         amountUnit: '万元'
       },
       '商机明细'
@@ -127,7 +146,7 @@ describe('field mappings', () => {
 
     expect(rows[0]).toMatchObject({
       projectId: 'A-1', amount: 1200, unit: '万元', createdAt: '2026-01-02',
-      status: '跟进中', probabilityBand: '中等概率'
+      status: '跟进中', probabilityBand: '60%'
     });
   });
 

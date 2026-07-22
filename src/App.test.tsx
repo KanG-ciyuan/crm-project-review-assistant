@@ -32,7 +32,7 @@ it('retains a user-selected review status after a page-style storage reload', ()
     createdAt: '2026-07-01',
     lastFollowUpAt: '2026-07-10',
     expectedSignAt: '2026-08-01',
-    probabilityBand: '低概率'
+    probabilityBand: '40%'
   });
   const pending = reconcileReviewRecords([row], ['P-1'], {}, new Date('2026-07-17T09:00:00Z'));
   const reviewed = updateReviewRecord(pending, 'P-1', { status: '已忽略', note: '已处理。' }, new Date('2026-07-17T10:00:00Z'));
@@ -61,7 +61,7 @@ it('copies the feedback email address from the footer', async () => {
   expect(await screen.findByRole('button', { name: '已复制' })).toBeInTheDocument();
 });
 
-it('opens the guided mapper for an arbitrary worksheet instead of requiring fixed headers', async () => {
+it('opens smart confirmation for an arbitrary worksheet instead of requiring fixed headers', async () => {
   const user = userEvent.setup();
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([
@@ -76,7 +76,8 @@ it('opens the guided mapper for an arbitrary worksheet instead of requiring fixe
   render(<App />);
   await user.upload(screen.getByLabelText('选择 .xlsx 文件'), new File(['content'], '客户商机.xlsx'));
 
-  expect(await screen.findByRole('heading', { name: '确认表头行' })).toBeInTheDocument();
+  expect(await screen.findByRole('heading', { name: '有 1 项需要确认' })).toBeInTheDocument();
+  expect(screen.getByLabelText('方案沟通对应状态')).toBeInTheDocument();
   expect(screen.getByRole('option', { name: '自定义商机表' })).toBeInTheDocument();
   expect(screen.queryByText('缺少必填字段')).not.toBeInTheDocument();
 });
@@ -86,13 +87,13 @@ it('restarts the wizard when a same-name file and sheet are uploaded again', asy
   const firstWorkbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(firstWorkbook, XLSX.utils.aoa_to_sheet([
     ['标题'], ['说明'], ['导出时间'], ['空行'],
-    ['项目名称', '销售经理'],
-    ['旧项目', '销售甲']
+    ['项目名称', '销售经理', '储备金额', '金额单位'],
+    ['旧项目', '销售甲', 0, '万元']
   ]), '商机表');
   const secondWorkbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(secondWorkbook, XLSX.utils.aoa_to_sheet([
-    ['项目名称', '销售经理'],
-    ['新项目', '销售乙']
+    ['项目名称', '销售经理', '储备金额', '金额单位'],
+    ['新项目', '销售乙', 0, '万元']
   ]), '商机表');
   vi.spyOn(workbookApi, 'inspectWorkbook')
     .mockResolvedValueOnce({ workbook: firstWorkbook, sheetNames: ['商机表'] })
@@ -101,10 +102,12 @@ it('restarts the wizard when a same-name file and sheet are uploaded again', asy
   render(<App />);
   const input = screen.getByLabelText('选择 .xlsx 文件');
   await user.upload(input, new File(['first'], '商机.xlsx'));
-  expect(await screen.findByLabelText('表头所在行')).toHaveValue('4');
+  await user.click(await screen.findByRole('button', { name: '开始分析' }));
+  expect(screen.getByText('旧项目')).toBeInTheDocument();
 
   await user.upload(input, new File(['second'], '商机.xlsx'));
-  expect(await screen.findByLabelText('表头所在行')).toHaveValue('0');
+  expect(screen.queryByLabelText('经营复盘草稿')).not.toBeInTheDocument();
+  await user.click(await screen.findByRole('button', { name: '开始分析' }));
   expect(screen.getByText('新项目')).toBeInTheDocument();
 });
 
@@ -120,7 +123,7 @@ it('keeps the file picker reachable from the keyboard', async () => {
   expect(input).toHaveFocus();
 });
 
-it('clears an existing analysis when the confirmed mapping is edited', async () => {
+it('runs a simple workbook through the smart import path', async () => {
   const user = userEvent.setup();
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([
@@ -131,14 +134,8 @@ it('clears an existing analysis when the confirmed mapping is edited', async () 
 
   render(<App />);
   await user.upload(screen.getByLabelText('选择 .xlsx 文件'), new File(['content'], '商机.xlsx'));
-  await user.click(await screen.findByRole('button', { name: '确认表头行' }));
-  await user.click(screen.getByRole('button', { name: '确认字段关系' }));
-  await user.click(screen.getByRole('button', { name: '确认状态口径' }));
-  await user.click(screen.getByRole('button', { name: '开始规则分析' }));
+  await user.click(await screen.findByRole('button', { name: '开始分析' }));
   expect(screen.getByRole('heading', { name: '数据质量待复核' })).toBeInTheDocument();
-
-  await user.click(screen.getByRole('button', { name: '返回' }));
-  expect(screen.queryByRole('heading', { name: '数据质量待复核' })).not.toBeInTheDocument();
 });
 
 it('runs the confirmed 30-day rule pack and removes the legacy percentile rule', async () => {
@@ -146,10 +143,10 @@ it('runs the confirmed 30-day rule pack and removes the legacy percentile rule',
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([
     ['项目编号', '项目名称', '客户名称', '销售经理', '项目状态', '储备金额', '创建日期', '最近跟进日期', '预计签约日期', '成单概率'],
-    ['A', '31天项目', '客户A', '销售甲', '跟进中', 100, '2026-01-01', '2026-06-20', '2026-08-01', '中等概率'],
-    ['B', '21天项目', '客户B', '销售乙', '跟进中', 200, '2026-01-01', '2026-06-30', '2026-08-01', '中等概率'],
-    ['C', '普通项目', '客户C', '销售丙', '跟进中', 300, '2026-01-01', '2026-07-10', '2026-08-01', '中等概率'],
-    ['D', '高金额低概率项目', '客户D', '销售丁', '跟进中', 900, '2026-01-01', '2026-07-10', '2026-08-01', '低概率']
+    ['A', '31天项目', '客户A', '销售甲', '跟进中', 100, '2026-01-01', '2026-06-20', '2026-08-01', '60%'],
+    ['B', '21天项目', '客户B', '销售乙', '跟进中', 200, '2026-01-01', '2026-06-30', '2026-08-01', '60%'],
+    ['C', '普通项目', '客户C', '销售丙', '跟进中', 300, '2026-01-01', '2026-07-10', '2026-08-01', '60%'],
+    ['D', '高金额低概率项目', '客户D', '销售丁', '跟进中', 900, '2026-01-01', '2026-07-10', '2026-08-01', '40%']
   ]), '商机表');
   vi.spyOn(workbookApi, 'inspectWorkbook').mockResolvedValue({ workbook, sheetNames: ['商机表'] });
   vi.useFakeTimers({ shouldAdvanceTime: true });
@@ -157,11 +154,8 @@ it('runs the confirmed 30-day rule pack and removes the legacy percentile rule',
 
   render(<App />);
   await user.upload(screen.getByLabelText('选择 .xlsx 文件'), new File(['content'], '商机.xlsx'));
-  await user.click(await screen.findByRole('button', { name: '确认表头行' }));
-  await user.click(screen.getByRole('button', { name: '确认字段关系' }));
-  await user.selectOptions(screen.getByLabelText('统一金额单位'), '万元');
-  await user.click(screen.getByRole('button', { name: '确认状态口径' }));
-  await user.click(screen.getByRole('button', { name: '开始规则分析' }));
+  await user.selectOptions(await screen.findByLabelText('金额单位'), '万元');
+  await user.click(screen.getByRole('button', { name: '开始分析' }));
 
   const resultsTable = within(screen.getByRole('region', { name: '维护超期待整改' })).getByRole('table');
   expect(within(resultsTable).getAllByText('跟进超期')).toHaveLength(1);
@@ -175,8 +169,8 @@ it('projects one global filter across metrics and result areas without changing 
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([
     ['项目编号', '项目名称', '客户名称', '部门', '销售经理', '项目状态', '储备金额', '创建日期', '最近跟进日期', '预计签约日期', '成单概率'],
-    ['EAST', '华东超期项目', '客户甲', '华东部', '销售甲', '跟进中', 1200, '2026-01-01', '2026-06-01', '2026-08-01', '中等概率'],
-    ['SOUTH', '华南超期项目', '客户乙', '华南部', '销售乙', '跟进中', 5000, '2026-01-01', '2026-06-01', '2026-08-01', '中等概率']
+    ['EAST', '华东超期项目', '客户甲', '华东部', '销售甲', '跟进中', 1200, '2026-01-01', '2026-06-01', '2026-08-01', '60%'],
+    ['SOUTH', '华南超期项目', '客户乙', '华南部', '销售乙', '跟进中', 5000, '2026-01-01', '2026-06-01', '2026-08-01', '60%']
   ]), '商机表');
   vi.spyOn(workbookApi, 'inspectWorkbook').mockResolvedValue({ workbook, sheetNames: ['商机表'] });
   vi.useFakeTimers({ shouldAdvanceTime: true });
@@ -184,11 +178,8 @@ it('projects one global filter across metrics and result areas without changing 
 
   render(<App />);
   await user.upload(screen.getByLabelText('选择 .xlsx 文件'), new File(['content'], '商机.xlsx'));
-  await user.click(await screen.findByRole('button', { name: '确认表头行' }));
-  await user.click(screen.getByRole('button', { name: '确认字段关系' }));
-  await user.selectOptions(screen.getByLabelText('统一金额单位'), '万元');
-  await user.click(screen.getByRole('button', { name: '确认状态口径' }));
-  await user.click(screen.getByRole('button', { name: '开始规则分析' }));
+  await user.selectOptions(await screen.findByLabelText('金额单位'), '万元');
+  await user.click(screen.getByRole('button', { name: '开始分析' }));
 
   const projectCountMetric = screen.getByText('项目总数').closest('article')!;
   expect(within(projectCountMetric).getByText('2')).toBeInTheDocument();
@@ -285,34 +276,9 @@ it('analyzes an arbitrary Excel workflow and keeps seller filters, findings, met
   expect(sourceInput).toHaveValue('企业机会台账');
   await user.clear(sourceInput);
   await user.type(sourceInput, '华东企业 CRM');
-  expect(await screen.findByRole('heading', { name: '确认表头行' })).toBeInTheDocument();
-  await user.click(screen.getByRole('button', { name: '确认表头行' }));
-
-  const fieldTargets: Record<string, string> = {
-    机会主键: 'projectId',
-    机会主题: 'projectName',
-    客户主体: 'customerName',
-    负责团队: 'department',
-    业务人员: 'salesManager',
-    推进阶段: 'status',
-    预计规模: 'amount',
-    登记时间: 'createdAt',
-    末次联系: 'lastFollowUpAt',
-    计划成交日: 'expectedSignAt',
-    成功可能性: 'probabilityBand'
-  };
-  for (const [sourceHeader, targetField] of Object.entries(fieldTargets)) {
-    await user.selectOptions(screen.getByLabelText(`${sourceHeader}处理方式`), 'standard');
-    await user.selectOptions(screen.getByLabelText(`${sourceHeader}标准字段`), targetField);
-  }
-  await user.click(screen.getByRole('button', { name: '确认字段关系' }));
-  await user.selectOptions(screen.getByLabelText('持续推进对应状态'), '跟进中');
-  await user.selectOptions(screen.getByLabelText('40%对应概率'), '低概率');
-  await user.selectOptions(screen.getByLabelText('70%对应概率'), '中等概率');
-  await user.selectOptions(screen.getByLabelText('80%对应概率'), '较高概率');
-  await user.selectOptions(screen.getByLabelText('统一金额单位'), '万元');
-  await user.click(screen.getByRole('button', { name: '确认状态口径' }));
-  await user.click(screen.getByRole('button', { name: '开始规则分析' }));
+  await user.selectOptions(await screen.findByLabelText('持续推进对应状态'), '跟进中');
+  await user.selectOptions(screen.getByLabelText('金额单位'), '万元');
+  await user.click(screen.getByRole('button', { name: '开始分析' }));
 
   const overview = screen.getByRole('region', { name: '经营概览' });
   const projectCountMetric = within(overview).getByText('项目总数').closest('article')!;
@@ -359,11 +325,8 @@ it('isolates review decisions by confirmed data source instead of file name', as
     await user.type(sourceInput, source);
   };
   const analyze = async () => {
-    await user.click(await screen.findByRole('button', { name: '确认表头行' }));
-    await user.click(screen.getByRole('button', { name: '确认字段关系' }));
-    await user.selectOptions(screen.getByLabelText('统一金额单位'), '万元');
-    await user.click(screen.getByRole('button', { name: '确认状态口径' }));
-    await user.click(screen.getByRole('button', { name: '开始规则分析' }));
+    await user.selectOptions(await screen.findByLabelText('金额单位'), '万元');
+    await user.click(screen.getByRole('button', { name: '开始分析' }));
   };
 
   await user.upload(input, new File(['first'], '同名项目台账.xlsx'));
@@ -380,7 +343,7 @@ it('isolates review decisions by confirmed data source instead of file name', as
 
   await setSource('客户甲 CRM账套');
   expect(screen.queryByRole('heading', { name: '数据质量待复核' })).not.toBeInTheDocument();
-  expect(screen.getByRole('heading', { name: '确认表头行' })).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: '有 1 项需要确认' })).toBeInTheDocument();
   await analyze();
   expect(screen.getByLabelText('SAME-1 审查状态')).toHaveValue('已忽略');
 
@@ -408,5 +371,5 @@ it('requires a nonblank confirmed data source before opening the import wizard',
   await user.clear(sourceInput);
 
   expect(screen.getByRole('alert')).toHaveTextContent('请填写数据来源标识后继续导入。');
-  expect(screen.queryByRole('heading', { name: '确认表头行' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('heading', { name: '数据已准备好' })).not.toBeInTheDocument();
 });
