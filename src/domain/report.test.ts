@@ -32,4 +32,49 @@ describe('createReviewReport', () => {
     expect(report).toContain('已通知销售修正金额。');
     expect(report).toContain('金额、日期、项目状态及业务结论须由业务人员确认');
   });
+
+  it('writes a markdown-safe active filter scope immediately after the generated date', () => {
+    const report = createReviewReport(analysis, {}, new Date('2026-07-16'), [
+      '部门：华东\n一部',
+      '标签：跟进 | 超期'
+    ]);
+
+    expect(report).toContain('生成日期：2026-07-16\n\n筛选范围：部门：华东 一部；标签：跟进 / 超期');
+    expect(report).not.toContain('筛选范围：部门：华东\n一部');
+  });
+
+  it('only reports rows and actionable review progress from the projected analysis', () => {
+    const hidden = makeProject({ sourceKey: 'row-hidden', projectId: 'P-HIDDEN', projectName: '不应泄漏项目' });
+    const visibleAction: Finding = {
+      ...findings[0], rowKey: row.sourceKey, projectId: row.projectId, projectName: row.projectName,
+      category: '维护超期待整改', label: '跟进超期', level: 'action'
+    };
+    const projected = buildAnalysis([row], [visibleAction, findings[1]], new Date('2026-07-16'));
+    const mixedReviews: ReviewRecordMap = {
+      ...reviews,
+      [hidden.sourceKey]: {
+        projectId: hidden.projectId, projectName: hidden.projectName, status: '确认业务风险', note: '隐藏项目备注',
+        firstReviewedAt: '2026-07-17T09:00:00.000Z', lastReviewedAt: '2026-07-17T09:00:00.000Z',
+        fingerprint: 'hidden', dataUpdated: false, history: []
+      }
+    };
+
+    const report = createReviewReport(projected, mixedReviews, new Date('2026-07-16'), ['部门：华东部']);
+
+    expect(report).toContain('远景综合管廊项目');
+    expect(report).not.toContain(hidden.projectName);
+    expect(report).not.toContain('仅属于隐藏项目的证据');
+    expect(report).not.toContain('隐藏项目备注');
+    expect(report).toContain('## 经营结构分析');
+    expect(report).not.toContain('重点风险项目');
+    expect(report).not.toContain('低概率重点项目');
+  });
+
+  it('does not count information-only findings as pending review work', () => {
+    const infoOnly = buildAnalysis([row], [findings[1]], new Date('2026-07-16'));
+    const report = createReviewReport(infoOnly, reviews, new Date('2026-07-16'));
+
+    expect(report).toContain('### 待复核项目\n\n本期无项目。');
+    expect(report).toContain('### 已确认数据错误项目\n\n本期无项目。');
+  });
 });

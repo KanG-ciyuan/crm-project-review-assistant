@@ -6,6 +6,12 @@ import type { ReviewRecordMap, ReviewStatus } from './review';
 
 const formatDate = (date: Date) => date.toISOString().slice(0, 10);
 
+const safeScopeItem = (value: string) => value
+  .replace(/[\r\n\t]+/g, ' ')
+  .replace(/\|/g, '/')
+  .replace(/\s+/g, ' ')
+  .trim();
+
 const findingState = (finding: Finding) => finding.level === 'info'
   ? '经营观察'
   : finding.level === 'action' ? '待整改' : '待人工确认';
@@ -37,8 +43,14 @@ function renderReviewProgress(analysis: AnalysisResult, reviews: ReviewRecordMap
   return [...renderedSections, '### 已忽略项目', `本期已忽略 ${ignoredCount} 个项目。`].join('\n\n');
 }
 
-export function createReviewReport(analysis: AnalysisResult, reviews: ReviewRecordMap, today: Date): string {
+export function createReviewReport(
+  analysis: AnalysisResult,
+  reviews: ReviewRecordMap,
+  today: Date,
+  filterScope: string[] = []
+): string {
   const { overview } = analysis;
+  const scope = filterScope.map(safeScopeItem).filter(Boolean);
   const resultSections = FINDING_CATEGORIES.flatMap((category) => [
     `## ${category}`,
     renderFindings(analysis.results[category])
@@ -46,6 +58,7 @@ export function createReviewReport(analysis: AnalysisResult, reviews: ReviewReco
   return [
     '# 储备项目经营复盘',
     `生成日期：${formatDate(today)}`,
+    ...(scope.length > 0 ? [`筛选范围：${scope.join('；')}`] : []),
     '> 本报告基于导入数据和规则标签生成，金额、日期、项目状态及业务结论须由业务人员确认。',
     '## 经营概览',
     `本期共导入 ${overview.projectCount} 个项目，储备金额合计 ${overview.totalAmountWan.toLocaleString()} 万元。跟进中 ${overview.inProgressCount} 个，呆滞 ${overview.dormantCount} 个，已签约 ${overview.signedCount} 个，已丢单 ${overview.lostCount} 个。`,

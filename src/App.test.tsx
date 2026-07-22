@@ -201,8 +201,49 @@ it('projects one global filter across metrics and result areas without changing 
   expect(within(maintenance).getByText('华东超期项目')).toBeInTheDocument();
   expect(within(maintenance).queryByText('华南超期项目')).not.toBeInTheDocument();
   const reportValue = (screen.getByLabelText('经营复盘草稿') as HTMLTextAreaElement).value;
+  expect(screen.getByText('当前 1 / 全部 2 个项目')).toBeInTheDocument();
+  expect(screen.getByText('筛选范围：部门：华东部')).toBeInTheDocument();
   expect(reportValue).toContain('华东超期项目');
   expect(reportValue).not.toContain('华南超期项目');
+  expect(reportValue).toContain('筛选范围：部门：华东部');
+
+  const createdUrls: string[] = [];
+  const exportedBlobs: Blob[] = [];
+  const downloadedNames: string[] = [];
+  vi.spyOn(URL, 'createObjectURL').mockImplementation((blob) => {
+    if (!(blob instanceof Blob)) throw new TypeError('报告导出必须使用 Blob');
+    exportedBlobs.push(blob);
+    const url = `blob:test-${createdUrls.length + 1}`;
+    createdUrls.push(url);
+    return url;
+  });
+  const revokeObjectURL = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
+  vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
+    downloadedNames.push(this.download);
+  });
+
+  await user.click(screen.getByRole('button', { name: '导出当前筛选结果' }));
+  await user.click(screen.getByRole('button', { name: '导出全部结果' }));
+
+  expect(downloadedNames).toEqual([
+    '储备项目经营复盘-2026-07-21-当前筛选.md',
+    '储备项目经营复盘-2026-07-21-全部.md'
+  ]);
+  expect(revokeObjectURL).toHaveBeenNthCalledWith(1, createdUrls[0]);
+  expect(revokeObjectURL).toHaveBeenNthCalledWith(2, createdUrls[1]);
+  const readBlob = (blob: Blob) => new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.addEventListener('load', () => resolve(String(reader.result)));
+    reader.addEventListener('error', () => reject(reader.error));
+    reader.readAsText(blob);
+  });
+  const currentExport = await readBlob(exportedBlobs[0]);
+  const allExport = await readBlob(exportedBlobs[1]);
+  expect(currentExport).toContain('华东超期项目');
+  expect(currentExport).not.toContain('华南超期项目');
+  expect(allExport).toContain('华东超期项目');
+  expect(allExport).toContain('华南超期项目');
+  expect(allExport).not.toContain('筛选范围：');
 
   await user.click(screen.getByRole('button', { name: '清除全部筛选' }));
   expect(screen.getByText('当前筛选 2 / 全部 2 个项目')).toBeInTheDocument();

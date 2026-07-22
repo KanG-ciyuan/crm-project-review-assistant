@@ -6,7 +6,7 @@ import { AnalysisFilters } from './components/AnalysisFilters';
 import { AnalysisResults } from './components/AnalysisResults';
 import { ImportWizard, type ImportReadyPayload } from './components/ImportWizard';
 import { buildAnalysis, evaluateRulePack, projectAnalysis, type AnalysisResult, type CanonicalFieldKey } from './domain/analyze';
-import { EMPTY_FILTERS, filterProjectKeys, type FilterState } from './domain/filters';
+import { describeFilters, EMPTY_FILTERS, filterProjectKeys, type FilterState } from './domain/filters';
 import { createReviewReport } from './domain/report';
 import { loadReviewRecords, reconcileReviewRecords, saveReviewRecords, updateReviewRecord, type ReviewRecordMap, type ReviewStatus } from './domain/review';
 import { inspectSheet, inspectWorkbook, type WorkbookInspection } from './lib/workbook';
@@ -19,7 +19,7 @@ export default function App() {
   const [importReady, setImportReady] = useState<ImportReadyPayload | null>(null);
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
   const [filters, setFilters] = useState<FilterState>(EMPTY_FILTERS);
-  const [report, setReport] = useState('');
+  const [currentReport, setCurrentReport] = useState('');
   const [error, setError] = useState('');
   const [reviewRecords, setReviewRecords] = useState<ReviewRecordMap>(() => loadReviewRecords(window.localStorage));
   const [feedbackCopied, setFeedbackCopied] = useState(false);
@@ -33,10 +33,19 @@ export default function App() {
     () => analysis ? projectAnalysis(analysis, selectedKeys) : null,
     [analysis, selectedKeys]
   );
+  const filterScope = useMemo(() => describeFilters(filters), [filters]);
+  const generatedCurrentReport = useMemo(
+    () => visibleAnalysis ? createReviewReport(visibleAnalysis, reviewRecords, new Date(), filterScope) : '',
+    [visibleAnalysis, reviewRecords, filterScope]
+  );
+  const allReport = useMemo(
+    () => analysis ? createReviewReport(analysis, reviewRecords, new Date()) : '',
+    [analysis, reviewRecords]
+  );
 
   useEffect(() => {
-    if (visibleAnalysis) setReport(createReviewReport(visibleAnalysis, reviewRecords, new Date()));
-  }, [visibleAnalysis, reviewRecords]);
+    setCurrentReport(generatedCurrentReport);
+  }, [generatedCurrentReport]);
 
   async function onFileChange(file: File | null) {
     if (!file) return;
@@ -45,7 +54,7 @@ export default function App() {
       setAnalysis(null);
       setFilters(EMPTY_FILTERS);
       setImportReady(null);
-      setReport('');
+      setCurrentReport('');
       const next = await inspectWorkbook(file);
       setImportRevision((current) => current + 1);
       setInspection(next);
@@ -77,14 +86,14 @@ export default function App() {
     setFilters(EMPTY_FILTERS);
     setImportReady(payload);
     setReviewRecords(nextReviews);
-    setReport(createReviewReport(result, nextReviews, now));
+    setCurrentReport(createReviewReport(result, nextReviews, now));
   }
 
   function clearImportedAnalysis() {
     setImportReady(null);
     setAnalysis(null);
     setFilters(EMPTY_FILTERS);
-    setReport('');
+    setCurrentReport('');
   }
 
   function changeReview(projectId: string, patch: { status?: ReviewStatus; note?: string }) {
@@ -100,13 +109,15 @@ export default function App() {
     setReviewRecords(next);
   }
 
-  function downloadReport() {
+  function downloadReport(report: string, suffix: '当前筛选' | '全部') {
+    if (!report.trim()) return;
     const blob = new Blob([report], { type: 'text/markdown;charset=utf-8' });
     const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `储备项目经营复盘-${new Date().toISOString().slice(0, 10)}.md`;
+    const objectUrl = URL.createObjectURL(blob);
+    link.href = objectUrl;
+    link.download = `储备项目经营复盘-${new Date().toISOString().slice(0, 10)}-${suffix}.md`;
     link.click();
-    URL.revokeObjectURL(link.href);
+    URL.revokeObjectURL(objectUrl);
   }
 
   async function copyFeedbackEmail() {
@@ -125,7 +136,7 @@ export default function App() {
         {fileName && <div className="file-state"><FileSpreadsheet size={17} /><div><b>{fileName}</b><span>{importReady?.rows.length ?? '待确认'} 条项目记录</span></div></div>}
         {error && <p className="error">{error}</p>}
       </div>
-      {inspection && <div className="side-section"><p className="side-label">工作表</p><select aria-label="工作表" value={sheetName} onChange={(event) => { setSheetName(event.target.value); setImportReady(null); setAnalysis(null); setFilters(EMPTY_FILTERS); setReport(''); }}>{inspection.sheetNames.map((name) => <option key={name}>{name}</option>)}</select>
+      {inspection && <div className="side-section"><p className="side-label">工作表</p><select aria-label="工作表" value={sheetName} onChange={(event) => { setSheetName(event.target.value); setImportReady(null); setAnalysis(null); setFilters(EMPTY_FILTERS); setCurrentReport(''); }}>{inspection.sheetNames.map((name) => <option key={name}>{name}</option>)}</select>
         <p className="side-label threshold-title">规则阈值</p>
         <Threshold label="跟进维护周期" value={30} suffix="天" />
         <Threshold label="重点项目金额" value={1000} suffix="万元" />
@@ -140,7 +151,7 @@ export default function App() {
       {analysis && visibleAnalysis && <>
         <AnalysisFilters analysis={analysis} filters={filters} reviews={reviewRecords} selectedCount={selectedKeys.size} totalCount={analysis.rows.length} onChange={setFilters} />
         <AnalysisResults analysis={visibleAnalysis} reviews={reviewRecords} onChangeReview={changeReview} />
-        <section className="report-card"><div className="table-heading"><div><h2>经营复盘草稿</h2><p>本地规则自动生成，可人工编辑后下载。</p></div><button className="secondary" onClick={downloadReport} disabled={!report}><Download size={15} /> 下载 Markdown</button></div><textarea value={report} onChange={(event) => setReport(event.target.value)} aria-label="经营复盘草稿" /></section>
+        <section className="report-card"><div className="table-heading"><div><h2>经营复盘草稿</h2><p>当前 {visibleAnalysis.rows.length} / 全部 {analysis.rows.length} 个项目</p><p>筛选范围：{filterScope.length > 0 ? filterScope.join('；').replace(/[\r\n\t]+/g, ' ').replace(/\|/g, '/') : '全部项目'}</p></div><div><button className="secondary" onClick={() => downloadReport(currentReport, '当前筛选')} disabled={!currentReport.trim()}><Download size={15} /> 导出当前筛选结果</button> <button className="secondary" onClick={() => downloadReport(allReport, '全部')} disabled={!allReport.trim()}><Download size={15} /> 导出全部结果</button></div></div><textarea value={currentReport} onChange={(event) => setCurrentReport(event.target.value)} aria-label="经营复盘草稿" /></section>
       </>}
       <footer className="product-footer">
         <span>反馈建议</span>
