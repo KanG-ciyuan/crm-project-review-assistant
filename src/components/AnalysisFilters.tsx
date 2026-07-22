@@ -53,7 +53,7 @@ export function AnalysisFilters({ analysis, filters, reviews, selectedCount, tot
   const chips: ActiveChip[] = [];
   if (filters.query.trim()) chips.push({ key: 'query', label: `关键词：${filters.query.trim()}`, remove: () => onChange({ ...filters, query: '' }) });
   const chipGroups: Array<[ArrayFilterKey, string]> = [
-    ['departments', '部门'], ['salesManagers', '销售经理'], ['statuses', '项目状态'],
+    ['customerNames', '客户名称'], ['departments', '部门'], ['salesManagers', '销售经理'], ['statuses', '项目状态'],
     ['probabilityBands', '成单概率'], ['amountBands', '金额等级'], ['followUpBands', '跟进周期'],
     ['reserveCycleBands', '储备周期'], ['categories', '结果分类'], ['labels', '标签'],
     ['reviewStatuses', '审查状态'], ['industries', '行业'], ['regions', '区域'],
@@ -84,6 +84,7 @@ export function AnalysisFilters({ analysis, filters, reviews, selectedCount, tot
     </div>
 
     <div className="filter-toolbar">
+      {options.customerNames.length > 0 && <FilterGroup title="客户名称" fieldLabel="客户名称" stateKey="customerNames" options={options.customerNames} selected={filters.customerNames} onToggle={(value) => toggleArray('customerNames', value)} onAll={() => setArray('customerNames', options.customerNames.map((item) => item.value))} onClear={() => setArray('customerNames', [])} />}
       <FilterGroup title="部门" fieldLabel="部门" stateKey="departments" options={options.departments} selected={filters.departments} onToggle={(value) => toggleArray('departments', value)} onAll={() => setArray('departments', options.departments.map((item) => item.value))} onClear={() => setArray('departments', [])} />
       <FilterGroup title="销售经理" fieldLabel="销售经理" stateKey="salesManagers" options={options.salesManagers} selected={filters.salesManagers} onToggle={(value) => toggleArray('salesManagers', value)} onAll={() => setArray('salesManagers', options.salesManagers.map((item) => item.value))} onClear={() => setArray('salesManagers', [])} onOnly={(value) => setArray('salesManagers', [value])} />
       <FilterGroup title="项目状态" fieldLabel="项目状态" stateKey="statuses" options={options.statuses} selected={filters.statuses} onToggle={(value) => toggleArray('statuses', value)} onAll={() => setArray('statuses', options.statuses.map((item) => item.value))} onClear={() => setArray('statuses', [])} />
@@ -97,10 +98,10 @@ export function AnalysisFilters({ analysis, filters, reviews, selectedCount, tot
       <FilterGroup title="结果分类" fieldLabel="结果分类" stateKey="categories" options={options.categories} selected={filters.categories} onToggle={(value) => toggleArray('categories', value)} onAll={() => setArray('categories', options.categories.map((item) => item.value))} onClear={() => setArray('categories', [])} />
       <FilterGroup title="规则标签" fieldLabel="规则标签" stateKey="labels" options={options.labels} selected={filters.labels} onToggle={(value) => toggleArray('labels', value)} onAll={() => setArray('labels', options.labels.map((item) => item.value))} onClear={() => setArray('labels', [])} />
       <FilterGroup title="审查状态" fieldLabel="审查状态" stateKey="reviewStatuses" options={options.reviewStatuses} selected={filters.reviewStatuses} onToggle={(value) => toggleArray('reviewStatuses', value)} onAll={() => setArray('reviewStatuses', options.reviewStatuses.map((item) => item.value))} onClear={() => setArray('reviewStatuses', [])} />
-      <FilterGroup title="行业" fieldLabel="行业" stateKey="industries" options={options.industries} selected={filters.industries} onToggle={(value) => toggleArray('industries', value)} onAll={() => setArray('industries', options.industries.map((item) => item.value))} onClear={() => setArray('industries', [])} />
-      <FilterGroup title="区域" fieldLabel="区域" stateKey="regions" options={options.regions} selected={filters.regions} onToggle={(value) => toggleArray('regions', value)} onAll={() => setArray('regions', options.regions.map((item) => item.value))} onClear={() => setArray('regions', [])} />
-      <FilterGroup title="项目类型" fieldLabel="项目类型" stateKey="projectTypes" options={options.projectTypes} selected={filters.projectTypes} onToggle={(value) => toggleArray('projectTypes', value)} onAll={() => setArray('projectTypes', options.projectTypes.map((item) => item.value))} onClear={() => setArray('projectTypes', [])} />
-      <FilterGroup title="项目等级" fieldLabel="项目等级" stateKey="projectLevels" options={options.projectLevels} selected={filters.projectLevels} onToggle={(value) => toggleArray('projectLevels', value)} onAll={() => setArray('projectLevels', options.projectLevels.map((item) => item.value))} onClear={() => setArray('projectLevels', [])} />
+      {analysis.mappedFields.includes('industry') && <FilterGroup title="行业" fieldLabel="行业" stateKey="industries" options={options.industries} selected={filters.industries} onToggle={(value) => toggleArray('industries', value)} onAll={() => setArray('industries', options.industries.map((item) => item.value))} onClear={() => setArray('industries', [])} />}
+      {analysis.mappedFields.includes('region') && <FilterGroup title="区域" fieldLabel="区域" stateKey="regions" options={options.regions} selected={filters.regions} onToggle={(value) => toggleArray('regions', value)} onAll={() => setArray('regions', options.regions.map((item) => item.value))} onClear={() => setArray('regions', [])} />}
+      {analysis.mappedFields.includes('projectType') && <FilterGroup title="项目类型" fieldLabel="项目类型" stateKey="projectTypes" options={options.projectTypes} selected={filters.projectTypes} onToggle={(value) => toggleArray('projectTypes', value)} onAll={() => setArray('projectTypes', options.projectTypes.map((item) => item.value))} onClear={() => setArray('projectTypes', [])} />}
+      {analysis.mappedFields.includes('projectLevel') && <FilterGroup title="项目等级" fieldLabel="项目等级" stateKey="projectLevels" options={options.projectLevels} selected={filters.projectLevels} onToggle={(value) => toggleArray('projectLevels', value)} onAll={() => setArray('projectLevels', options.projectLevels.map((item) => item.value))} onClear={() => setArray('projectLevels', [])} />}
       {Object.entries(options.customFields).map(([field, values]) => <CustomFilterGroup key={field} field={field} values={values} selected={Object.prototype.hasOwnProperty.call(filters.customValues, field) ? filters.customValues[field] : []} onChange={(next) => setCustom(field, next)} />)}
     </div>
 

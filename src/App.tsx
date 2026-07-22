@@ -85,7 +85,7 @@ export default function App() {
     }
     if (mappedFields.has('amount') && payload.valueMappings.amountUnit) mappedFields.add('unit');
     const nextFindings = evaluateRulePack(payload.rows, now, { mappedFields });
-    const result = buildAnalysis(payload.rows, nextFindings, now);
+    const result = buildAnalysis(payload.rows, nextFindings, now, [...mappedFields]);
     const reviewKeys = [...new Set(nextFindings.filter((finding) => finding.level === 'review' || finding.level === 'action').map((finding) => finding.rowKey))];
     const nextReviews = reconcileReviewRecords(result.rows, reviewKeys, reviewRecords, now);
     saveReviewRecords(nextReviews, window.localStorage);

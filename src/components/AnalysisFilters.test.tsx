@@ -8,7 +8,7 @@ import { evaluateRulePack } from '../domain/rules';
 import { makeProject } from '../test/fixtures';
 import { AnalysisFilters } from './AnalysisFilters';
 
-const today = new Date('2026-07-21T09:00:00+08:00');
+const today = new Date(2026, 6, 21, 12);
 
 afterEach(cleanup);
 
@@ -27,6 +27,37 @@ function FilterHarness({ initial = EMPTY_FILTERS }: { initial?: FilterState }) {
 }
 
 describe('AnalysisFilters', () => {
+  it('hides unmapped extension filters and shows a mapped-but-empty extension field', () => {
+    const row = makeProject({ sourceKey: 'one', industry: '' });
+    const hidden = buildAnalysis([row], [], today, ['projectName']);
+    const { rerender } = render(<AnalysisFilters analysis={hidden} filters={EMPTY_FILTERS} reviews={{}} selectedCount={1} totalCount={1} onChange={vi.fn()} />);
+
+    expect(screen.queryByRole('group', { name: '行业筛选选项' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: '区域筛选选项' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: '项目类型筛选选项' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: '项目等级筛选选项' })).not.toBeInTheDocument();
+
+    const visible = buildAnalysis([row], [], today, ['projectName', 'industry']);
+    rerender(<AnalysisFilters analysis={visible} filters={EMPTY_FILTERS} reviews={{}} selectedCount={1} totalCount={1} onChange={vi.fn()} />);
+    expect(within(screen.getByRole('group', { name: '行业筛选选项' })).getByRole('checkbox', { name: '未填写 1个项目' })).toBeInTheDocument();
+  });
+
+  it('renders customer multi-select only for at most twenty distinct customer names', () => {
+    const onChange = vi.fn();
+    const low = buildAnalysis([
+      makeProject({ sourceKey: 'a', customerName: '客户甲' }),
+      makeProject({ sourceKey: 'b', customerName: '客户乙' })
+    ], [], today);
+    const { rerender } = render(<AnalysisFilters analysis={low} filters={EMPTY_FILTERS} reviews={{}} selectedCount={2} totalCount={2} onChange={onChange} />);
+    expect(within(screen.getByRole('group', { name: '客户名称筛选选项' })).getByRole('checkbox', { name: '客户甲 1个项目' })).toBeInTheDocument();
+
+    const highRows = Array.from({ length: 21 }, (_, index) => makeProject({ sourceKey: `customer-${index}`, customerName: `客户${index}` }));
+    const high = buildAnalysis(highRows, [], today);
+    rerender(<AnalysisFilters analysis={high} filters={EMPTY_FILTERS} reviews={{}} selectedCount={21} totalCount={21} onChange={onChange} />);
+    expect(screen.queryByRole('group', { name: '客户名称筛选选项' })).not.toBeInTheDocument();
+    expect(screen.getByRole('searchbox', { name: '搜索项目' })).toBeInTheDocument();
+  });
+
   it('updates department and cascaded seller filters, then clears all conditions', async () => {
     const user = userEvent.setup();
     render(<FilterHarness />);

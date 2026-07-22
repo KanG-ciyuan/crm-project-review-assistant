@@ -153,7 +153,7 @@ it('runs the confirmed 30-day rule pack and removes the legacy percentile rule',
   ]), '商机表');
   vi.spyOn(workbookApi, 'inspectWorkbook').mockResolvedValue({ workbook, sheetNames: ['商机表'] });
   vi.useFakeTimers({ shouldAdvanceTime: true });
-  vi.setSystemTime(new Date('2026-07-21T09:00:00+08:00'));
+  vi.setSystemTime(new Date(2026, 6, 21, 12));
 
   render(<App />);
   await user.upload(screen.getByLabelText('选择 .xlsx 文件'), new File(['content'], '商机.xlsx'));
@@ -180,7 +180,7 @@ it('projects one global filter across metrics and result areas without changing 
   ]), '商机表');
   vi.spyOn(workbookApi, 'inspectWorkbook').mockResolvedValue({ workbook, sheetNames: ['商机表'] });
   vi.useFakeTimers({ shouldAdvanceTime: true });
-  vi.setSystemTime(new Date('2026-07-21T00:30:00+08:00'));
+  vi.setSystemTime(new Date(2026, 6, 21, 12));
 
   render(<App />);
   await user.upload(screen.getByLabelText('选择 .xlsx 文件'), new File(['content'], '商机.xlsx'));
@@ -273,7 +273,7 @@ it('analyzes an arbitrary Excel workflow and keeps seller filters, findings, met
   ]), '自定义机会表');
   const bytes = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
   vi.useFakeTimers({ shouldAdvanceTime: true });
-  vi.setSystemTime(new Date('2026-07-21T09:00:00+08:00'));
+  vi.setSystemTime(new Date(2026, 6, 21, 12));
 
   render(<App />);
   await user.upload(
@@ -323,6 +323,11 @@ it('analyzes an arbitrary Excel workflow and keeps seller filters, findings, met
   const maintenance = screen.getByRole('region', { name: '维护超期待整改' });
   expect(within(maintenance).getByText('甲方超期商机')).toBeInTheDocument();
   expect(within(maintenance).getByText('跟进超期')).toBeInTheDocument();
+
+  await user.click(screen.getByRole('checkbox', { name: '客户甲 1个项目' }));
+  expect(screen.getByText('当前筛选 1 / 全部 3 个项目')).toBeInTheDocument();
+  expect((screen.getByLabelText('经营复盘草稿') as HTMLTextAreaElement).value).toContain('客户名称：客户甲');
+  await user.click(screen.getByRole('button', { name: '清除全部筛选' }));
 
   await user.click(screen.getByRole('checkbox', { name: '销售甲 1个项目' }));
 

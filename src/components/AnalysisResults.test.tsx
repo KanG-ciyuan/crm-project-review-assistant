@@ -17,7 +17,7 @@ const reviews: ReviewRecordMap = {
 
 describe('AnalysisResults', () => {
   it('renders five separate result areas and only asks actionable findings to be reviewed', () => {
-    render(<AnalysisResults analysis={buildAnalysis([row], findings, new Date('2026-07-21'))} reviews={reviews} onChangeReview={vi.fn()} />);
+    render(<AnalysisResults analysis={buildAnalysis([row], findings, new Date(2026, 6, 21, 12))} reviews={reviews} onChangeReview={vi.fn()} />);
 
     for (const title of ['数据质量待复核', '维护超期待整改', '疑似重复与撞单', '重点项目复盘', '经营结构分析']) {
       expect(screen.getByRole('heading', { name: title })).toBeInTheDocument();

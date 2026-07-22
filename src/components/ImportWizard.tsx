@@ -48,6 +48,14 @@ const PROBABILITIES: ProbabilityBand[] = ['询价类', '低概率', '中等概�
 const UNITS: Array<'元' | '万元' | '亿元'> = ['元', '万元', '亿元'];
 
 const presentText = (value: unknown) => value === null || value === undefined ? '' : String(value).trim();
+const isMissingFieldValue = (row: ProjectRow, field: CanonicalFieldKey) => {
+  if (field === 'amount') return row.amount === null;
+  if (field === 'status') return row.status === '未知';
+  if (field === 'probabilityBand') return row.probabilityBand === '未知';
+  return !presentText(row[field]);
+};
+const hasFormatError = (row: ProjectRow) => row.amountParseError || row.createdAtParseError
+  || row.lastFollowUpAtParseError || row.expectedSignAtParseError;
 const distinctValues = (records: Array<Record<string, unknown>>, header?: string) => {
   if (!header) return [];
   return [...new Set(records.map((record) => presentText(record[header])).filter(Boolean))];
@@ -163,6 +171,10 @@ export function ImportWizard({ inspection, sourceNamespace, onReady, capabilitie
     if (fields.has('amount') && amountUnit) fields.add('unit');
     return fields;
   }, [amountUnit, mappings]);
+  const missingValueRowCount = canonicalRows.filter((row) =>
+    [...mappedStandardFields].some((field) => isMissingFieldValue(row, field))
+  ).length;
+  const formatErrorRowCount = canonicalRows.filter(hasFormatError).length;
   const ruleCapabilities = capabilities ?? getRuleCapabilities(mappedStandardFields);
 
   function finish() {
@@ -232,6 +244,7 @@ export function ImportWizard({ inspection, sourceNamespace, onReady, capabilitie
     {step === 4 && <div className="wizard-panel">
       <div className="wizard-heading"><div><p>第 4 步</p><h2>确认分析范围</h2></div><span>{canonicalRows.length} 条记录</span></div>
       <div className="confirmation-grid"><article><span>标准字段</span><strong>{mappings.filter((mapping) => mapping.mode === 'standard').length}</strong></article><article><span>自定义字段</span><strong>{mappings.filter((mapping) => mapping.mode === 'custom').length}</strong></article><article><span>忽略字段</span><strong>{mappings.filter((mapping) => mapping.mode === 'ignore').length}</strong></article></div>
+      <div className="confirmation-grid"><article><span>状态原值</span><strong>{statusValues.length}</strong></article><article><span>概率原值</span><strong>{probabilityValues.length}</strong></article><article><span>金额单位</span><strong>{mapsAmount ? amountUnit : '不适用'}</strong></article><article><span>字段值为空或未知</span><strong>{missingValueRowCount} 条记录</strong></article><article><span>格式异常</span><strong>{formatErrorRowCount} 条记录</strong></article></div>
       <section className="capability-preview"><h3>规则执行范围</h3><ul>{ruleCapabilities.map((capability) => <li key={capability.ruleId}><b>{capability.name ?? capability.ruleId}</b><span>{capability.available ? '可执行' : `跳过：缺少${capability.missingFields.map((field) => FIELD_LABELS[field]).join('、')}`}</span></li>)}</ul></section>
       <p className="wizard-help">点击后将按已确认的字段关系和统一口径直接运行规则分析。</p>
       <div className="wizard-actions"><button className="secondary" type="button" onClick={() => returnTo(3)}>返回</button><button className="primary" type="button" onClick={finish}>开始规则分析</button></div>

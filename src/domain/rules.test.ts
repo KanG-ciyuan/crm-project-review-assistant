@@ -248,7 +248,7 @@ describe('confirmed To B rule pack', () => {
   it('does not treat an expected signing date on the analysis day as overdue', () => {
     const findings = evaluateRulePack([
       makeProject({ expectedSignAt: '2026-07-21' })
-    ], new Date('2026-07-21T16:30:00+08:00'));
+    ], new Date(2026, 6, 21, 16, 30));
     expect(findings.map((item) => item.label)).not.toContain('签约日期超期未更新');
   });
 

@@ -93,6 +93,33 @@ describe('global analysis filters', () => {
     expect(filterProjectKeys(analysis, {}, { ...EMPTY_FILTERS, departments: ['不存在'] })).toEqual(new Set());
   });
 
+  it('filters customer names with OR inside the dimension and AND across dimensions', () => {
+    const rows = [
+      makeProject({ sourceKey: 'a', customerName: '客户甲', department: '华东部' }),
+      makeProject({ sourceKey: 'b', customerName: '客户乙', department: '华东部' }),
+      makeProject({ sourceKey: 'c', customerName: '客户丙', department: '华南部' }),
+      makeProject({ sourceKey: 'special-customer', customerName: '__proto__', department: '华南部' })
+    ];
+    const analysis = buildAnalysis(rows, [], today);
+    const filters = { ...EMPTY_FILTERS, customerNames: ['客户甲', '客户乙'], departments: ['华东部'] };
+
+    expect(buildFilterOptions(analysis, EMPTY_FILTERS).customerNames).toEqual(expect.arrayContaining([
+      { value: '客户丙', count: 1 }, { value: '客户甲', count: 1 }, { value: '客户乙', count: 1 }, { value: '__proto__', count: 1 }
+    ]));
+    expect(filterProjectKeys(analysis, {}, filters)).toEqual(new Set(['a', 'b']));
+    expect(describeFilters(filters)).toContain('客户名称：客户甲');
+  });
+
+  it('omits high-cardinality customer options while keeping customer keyword search', () => {
+    const rows = Array.from({ length: 21 }, (_, index) => makeProject({
+      sourceKey: `customer-${index}`, projectId: `C-${index}`, customerName: `客户-${index}`
+    }));
+    const analysis = buildAnalysis(rows, [], today);
+
+    expect(buildFilterOptions(analysis, EMPTY_FILTERS).customerNames).toEqual([]);
+    expect(filterProjectKeys(analysis, {}, { ...EMPTY_FILTERS, query: '客户-20' })).toEqual(new Set(['customer-20']));
+  });
+
   it('filters extension dimensions, exact amount range, and date periods', () => {
     const rows = [
       makeProject({

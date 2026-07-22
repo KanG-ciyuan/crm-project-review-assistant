@@ -21,8 +21,8 @@ describe('field mappings', () => {
       '商机表'
     );
     expect(rows[0]).toMatchObject({ amount: null, amountParseError: true });
-    expect(evaluateRulePack(rows, new Date('2026-07-21')).map((item) => item.label)).toContain('金额格式异常');
-    expect(evaluateRulePack(rows, new Date('2026-07-21')).map((item) => item.label)).not.toContain('储备金额待补充');
+    expect(evaluateRulePack(rows, new Date(2026, 6, 21, 12)).map((item) => item.label)).toContain('金额格式异常');
+    expect(evaluateRulePack(rows, new Date(2026, 6, 21, 12)).map((item) => item.label)).not.toContain('储备金额待补充');
   });
 
   it('preserves non-empty unparseable dates for rule-level format review', () => {
@@ -44,7 +44,7 @@ describe('field mappings', () => {
       expectedSignAt: null,
       expectedSignAtParseError: true
     });
-    expect(evaluateRulePack(rows, new Date('2026-07-21')).filter((item) => item.label === '日期格式异常')).toHaveLength(3);
+    expect(evaluateRulePack(rows, new Date(2026, 6, 21, 12)).filter((item) => item.label === '日期格式异常')).toHaveLength(3);
   });
   it('suggests canonical fields from local aliases without an API call', () => {
     expect(suggestMappings(['商机名称', '业务负责人', '客户', '最后联系时间']))

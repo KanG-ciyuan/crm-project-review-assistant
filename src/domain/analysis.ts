@@ -1,4 +1,4 @@
-import { amountInWan, daysBetween, projectKey, type ProjectRow } from './project';
+import { amountInWan, daysBetween, projectKey, type CanonicalFieldKey, type ProjectRow } from './project';
 import type { Finding, FindingCategory } from './rules';
 
 export interface AnalysisOverview {
@@ -19,6 +19,7 @@ export interface BreakdownItem {
 export interface AnalysisResult {
   rows: ProjectRow[];
   findings: Finding[];
+  mappedFields: CanonicalFieldKey[];
   overview: AnalysisOverview;
   byDepartment: BreakdownItem[];
   bySalesManager: BreakdownItem[];
@@ -28,6 +29,12 @@ export interface AnalysisResult {
   results: Record<FindingCategory, Finding[]>;
   generatedAt: string;
 }
+
+const ALL_CANONICAL_FIELDS: CanonicalFieldKey[] = [
+  'projectId', 'projectName', 'customerName', 'department', 'salesManager',
+  'status', 'amount', 'unit', 'createdAt', 'lastFollowUpAt', 'expectedSignAt',
+  'probabilityBand', 'industry', 'region', 'projectType', 'projectLevel', 'latestUpdatedAt'
+];
 
 export const FINDING_CATEGORIES: FindingCategory[] = [
   '数据质量待复核',
@@ -104,11 +111,12 @@ function probabilityBreakdown(rows: ProjectRow[]): BreakdownItem[] {
   return PROBABILITY_ORDER.map((name) => groups.get(name)!);
 }
 
-function constructAnalysis(rows: ProjectRow[], findings: Finding[], today: Date, generatedAt = today.toISOString()): AnalysisResult {
+function constructAnalysis(rows: ProjectRow[], findings: Finding[], today: Date, generatedAt = today.toISOString(), mappedFields = ALL_CANONICAL_FIELDS): AnalysisResult {
   const results = Object.fromEntries(FINDING_CATEGORIES.map((category) => [category, findings.filter((item) => item.category === category)])) as Record<FindingCategory, Finding[]>;
   return {
     rows,
     findings,
+    mappedFields: [...mappedFields],
     overview: {
       projectCount: rows.length,
       totalAmountWan: rows.reduce((sum, row) => sum + amountFor(row), 0),
@@ -127,9 +135,9 @@ function constructAnalysis(rows: ProjectRow[], findings: Finding[], today: Date,
   };
 }
 
-export function buildAnalysis(rows: ProjectRow[], findings: Finding[], today: Date): AnalysisResult {
+export function buildAnalysis(rows: ProjectRow[], findings: Finding[], today: Date, mappedFields: CanonicalFieldKey[] = ALL_CANONICAL_FIELDS): AnalysisResult {
   const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-  return constructAnalysis(rows, findings, todayStart, today.toISOString());
+  return constructAnalysis(rows, findings, todayStart, today.toISOString(), mappedFields);
 }
 
 export function projectAnalysis(full: AnalysisResult, selectedRowKeys: Set<string>): AnalysisResult {
@@ -139,5 +147,5 @@ export function projectAnalysis(full: AnalysisResult, selectedRowKeys: Set<strin
   const today = Number.isNaN(generatedAt.getTime())
     ? new Date()
     : new Date(generatedAt.getFullYear(), generatedAt.getMonth(), generatedAt.getDate());
-  return constructAnalysis(rows, findings, today, full.generatedAt);
+  return constructAnalysis(rows, findings, today, full.generatedAt, full.mappedFields);
 }

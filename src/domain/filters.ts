@@ -4,6 +4,7 @@ import type { FindingCategory } from './rules';
 import { REVIEW_STATUSES, type ReviewRecordMap, type ReviewStatus } from './review';
 
 export interface FilterState {
+  customerNames: string[];
   departments: string[];
   salesManagers: string[];
   statuses: ProjectStatus[];
@@ -25,6 +26,7 @@ export interface FilterState {
 }
 
 export const EMPTY_FILTERS: FilterState = {
+  customerNames: [],
   departments: [],
   salesManagers: [],
   statuses: [],
@@ -84,6 +86,7 @@ export const RESERVE_CYCLE_BANDS: BandDefinition[] = [
 ];
 
 export interface FilterOptions {
+  customerNames: CountedOption[];
   departments: CountedOption[];
   salesManagers: CountedOption[];
   statuses: CountedOption<ProjectStatus>[];
@@ -188,6 +191,7 @@ export function filterProjectKeys(
     const reserveAge = ageInDays(row.createdAt, today);
     const reviewStatus = actionableReviewStatus(actionableRowKeys, reviews, key);
     return matchesSelection(filters.departments, display(row.department))
+      && matchesSelection(filters.customerNames, display(row.customerName))
       && matchesSelection(filters.salesManagers, display(row.salesManager))
       && matchesSelection(filters.statuses, row.status)
       && matchesSelection(filters.probabilityBands, row.probabilityBand)
@@ -260,7 +264,9 @@ export function buildFilterOptions(analysis: AnalysisResult, filters: FilterStat
     const status = actionableReviewStatus(actionableRowKeys, reviews, projectKey(row));
     return status ? [status] : [];
   });
+  const customerNames = countValues(analysis.rows.map((row) => display(row.customerName)));
   return {
+    customerNames: customerNames.length <= 20 ? customerNames : [],
     departments: countValues(analysis.rows.map((row) => display(row.department))),
     salesManagers: countValues(sellerRows.map((row) => display(row.salesManager))),
     statuses: countValues(analysis.rows.map((row) => row.status)),
@@ -285,6 +291,7 @@ const formatAmount = (value: number) => value.toLocaleString('zh-CN', { maximumF
 export function describeFilters(filters: FilterState): string[] {
   return [
     ...(filters.query.trim() ? [`关键词：${filters.query.trim()}`] : []),
+    ...describeMany('客户名称', filters.customerNames),
     ...describeMany('部门', filters.departments),
     ...describeMany('销售经理', filters.salesManagers),
     ...describeMany('项目状态', filters.statuses),

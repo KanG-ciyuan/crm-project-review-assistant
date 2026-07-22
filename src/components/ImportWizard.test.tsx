@@ -127,6 +127,27 @@ describe('ImportWizard', () => {
     }));
   });
 
+  it('summarizes confirmed value mappings and row-level data readiness before analysis', async () => {
+    const user = userEvent.setup();
+    render(<ImportWizard inspection={inspection([
+      ['项目名称', '项目状态', '成单概率', '储备金额', '创建日期', '最近跟进日期'],
+      ['格式异常项目', '推进中', '60%', '不是金额', '2026-13-01', '2026-07-01'],
+      ['缺失项目', '', '', 100, '2026-01-01', '错误日期']
+    ])} onReady={vi.fn()} />);
+
+    await confirmHeaderAndFields(user);
+    await user.selectOptions(screen.getByLabelText('推进中对应状态'), '跟进中');
+    await user.selectOptions(screen.getByLabelText('60%对应概率'), '中等概率');
+    await user.selectOptions(screen.getByLabelText('统一金额单位'), '万元');
+    await user.click(screen.getByRole('button', { name: '确认状态口径' }));
+
+    expect(screen.getByText('状态原值').closest('article')).toHaveTextContent('状态原值1');
+    expect(screen.getByText('概率原值').closest('article')).toHaveTextContent('概率原值1');
+    expect(screen.getByText('金额单位').closest('article')).toHaveTextContent('金额单位万元');
+    expect(screen.getByText('字段值为空或未知').closest('article')).toHaveTextContent('字段值为空或未知2 条记录');
+    expect(screen.getByText('格式异常').closest('article')).toHaveTextContent('格式异常2 条记录');
+  });
+
   it('shows skipped rules with clear missing field labels', async () => {
     const user = userEvent.setup();
     render(<ImportWizard inspection={inspection([

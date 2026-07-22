@@ -59,9 +59,10 @@ describe('analysis summaries', () => {
       ruleId: 'synthetic', rowKey: 'kept', projectId: '', projectName: '测试', customerName: '', department: '', salesManager: '', amountWan: 10,
       category: '经营结构分析', label: '仅存在于输入的标签', reason: '用于证明投影不会重新评估', level: 'info'
     };
-    const selected = projectAnalysis(buildAnalysis(rows, [synthetic], new Date(2026, 6, 21, 12)), new Set(['kept']));
+    const selected = projectAnalysis(buildAnalysis(rows, [synthetic], new Date(2026, 6, 21, 12), ['projectName']), new Set(['kept']));
 
     expect(selected.findings).toEqual([synthetic]);
     expect(selected.results['经营结构分析']).toEqual([synthetic]);
+    expect(selected.mappedFields).toEqual(['projectName']);
   });
 });
