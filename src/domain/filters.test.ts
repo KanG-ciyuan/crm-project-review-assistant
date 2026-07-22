@@ -146,4 +146,37 @@ describe('global analysis filters', () => {
     expect(options.reviewStatuses).toContainEqual({ value: '确认数据错误', count: 1 });
     expect(options.reviewStatuses).toContainEqual({ value: '待复核', count: 0 });
   });
+
+  it('ignores stale review records unless the current row has an actionable finding', () => {
+    const infoOnly = makeProject({ sourceKey: 'info', projectId: 'INFO' });
+    const noFinding = makeProject({ sourceKey: 'none', projectId: 'NONE' });
+    const actionable = makeProject({ sourceKey: 'action', projectId: 'ACTION' });
+    const finding = (rowKey: string, level: Finding['level']): Finding => ({
+      ruleId: `rule-${rowKey}`, rowKey, projectId: rowKey.toUpperCase(), projectName: `${rowKey}项目`,
+      customerName: '客户', department: '部门', salesManager: '销售', amountWan: 100,
+      category: level === 'info' ? '经营结构分析' : '维护超期待整改',
+      label: level === 'info' ? '经营观察' : '跟进超期', reason: '测试规则', level
+    });
+    const analysis = buildAnalysis([infoOnly, noFinding, actionable], [
+      finding('info', 'info'), finding('action', 'action')
+    ], today);
+    const staleRecord = (projectId: string): ReviewRecordMap[string] => ({
+      projectId, projectName: `${projectId}项目`, status: '确认业务风险', note: '',
+      firstReviewedAt: today.toISOString(), lastReviewedAt: today.toISOString(),
+      fingerprint: projectId, dataUpdated: false, history: []
+    });
+    const reviews: ReviewRecordMap = {
+      info: staleRecord('INFO'),
+      none: staleRecord('NONE')
+    };
+
+    expect(filterProjectKeys(analysis, reviews, { ...EMPTY_FILTERS, reviewStatuses: ['确认业务风险'] })).toEqual(new Set());
+    expect(filterProjectKeys(analysis, reviews, { ...EMPTY_FILTERS, reviewStatuses: ['待复核'] })).toEqual(new Set(['action']));
+    expect(buildFilterOptions(analysis, EMPTY_FILTERS, reviews).reviewStatuses).toEqual([
+      { value: '待复核', count: 1 },
+      { value: '确认数据错误', count: 0 },
+      { value: '确认业务风险', count: 0 },
+      { value: '已忽略', count: 0 }
+    ]);
+  });
 });

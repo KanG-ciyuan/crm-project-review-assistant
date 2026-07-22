@@ -136,9 +136,13 @@ function ageInDays(value: string | null, today: Date) {
 }
 
 function actionableReviewStatus(analysis: AnalysisResult, reviews: ReviewRecordMap, rowKey: string): ReviewStatus | null {
+  const hasActionableFinding = analysis.findings.some(
+    (finding) => finding.rowKey === rowKey && (finding.level === 'review' || finding.level === 'action')
+  );
+  if (!hasActionableFinding) return null;
   const explicit = reviews[rowKey]?.status;
   if (explicit) return explicit;
-  return analysis.findings.some((finding) => finding.rowKey === rowKey && finding.level !== 'info') ? '待复核' : null;
+  return '待复核';
 }
 
 function textMatches(row: ProjectRow, query: string) {
