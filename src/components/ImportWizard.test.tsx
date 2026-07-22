@@ -52,6 +52,24 @@ describe('ImportWizard smart path', () => {
     expect(onReady.mock.calls[0][0].rows[0]).toMatchObject({ status: '跟进中', probabilityBand: '60%' });
   });
 
+  it('accepts legacy probability ranges without showing confirmation inputs', async () => {
+    const user = userEvent.setup();
+    const onReady = vi.fn();
+    render(<ImportWizard inspection={inspection([
+      ['项目名称', '成单概率'],
+      ['项目甲', '71%-80%'],
+      ['项目乙', '1%-50%'],
+      ['项目丙', '81%-100%']
+    ])} onReady={onReady} />);
+
+    expect(screen.getByRole('heading', { name: '数据已准备好' })).toBeInTheDocument();
+    expect(screen.queryByText('有 3 项需要确认')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: '开始分析' }));
+
+    expect(onReady.mock.calls[0][0].rows.map((row: { probabilityBand: string }) => row.probabilityBand))
+      .toEqual(['71%-80%', '1%-50%', '81%-100%']);
+  });
+
   it('asks for one amount unit when the amount column has no unit information', async () => {
     const user = userEvent.setup();
     const onReady = vi.fn();

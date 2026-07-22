@@ -1,7 +1,7 @@
 import {
   amountInWan,
   daysBetween,
-  probabilityPercent,
+  probabilityRange,
   projectKey,
   type CanonicalFieldKey,
   type ProjectRow
@@ -366,8 +366,8 @@ function evaluateDuplicates(rows: ProjectRow[]): Finding[] {
 }
 
 function evaluateProbability(row: ProjectRow): Finding[] {
-  const percent = probabilityPercent(row.probabilityBand);
-  if (row.probabilityBand !== '询价类' && (percent === null || percent < 1 || percent > 50)) return [];
+  const range = probabilityRange(row.probabilityBand);
+  if (row.probabilityBand !== '询价类' && (range === null || range.min < 1 || range.max > 50)) return [];
   return [finding(row, 'probability-observation', '经营结构分析', '询价及低概率项目', `当前成单概率为${row.probabilityBand}，仅纳入经营结构观察`, 'info')];
 }
 

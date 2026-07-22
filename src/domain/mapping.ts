@@ -81,10 +81,7 @@ export function suggestMappings(headers: string[]): ColumnMapping[] {
 
 const validStatuses = new Set<ProjectStatus>(['跟进中', '呆滞', '已签约', '已丢单', '未知']);
 const validProbability = (value: string): value is ProbabilityBand => {
-  if (value === '询价类' || value === '未知') return true;
-  if (!/^\d+(?:\.\d+)?%$/.test(value)) return false;
-  const percent = Number(value.slice(0, -1));
-  return Number.isFinite(percent) && percent >= 0 && percent <= 100;
+  return value === '未知' || parseProbability(value) !== '未知';
 };
 const validUnits = new Set(['元', '万元', '亿元']);
 
@@ -192,6 +189,14 @@ export const parseProbability = (value: unknown): ProbabilityBand => {
   const source = toText(value);
   if (!source) return '未知';
   if (source === '询价类' || source === '询价') return '询价类';
+  const range = source.match(/^(\d+(?:\.\d+)?)%-(\d+(?:\.\d+)?)%$/);
+  if (range) {
+    const min = Number(range[1]);
+    const max = Number(range[2]);
+    return Number.isFinite(min) && Number.isFinite(max) && min >= 0 && min <= max && max <= 100
+      ? `${Number(min.toFixed(4))}%-${Number(max.toFixed(4))}%` as ProbabilityBand
+      : '未知';
+  }
   if (/^\d+(?:\.\d+)?%$/.test(source)) {
     const percent = Number(source.slice(0, -1));
     return Number.isFinite(percent) && percent >= 0 && percent <= 100

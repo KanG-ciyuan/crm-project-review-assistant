@@ -177,6 +177,18 @@ describe('confirmed To B rule pack', () => {
     expect(findings.filter((item) => ['low', 'long', 'term'].includes(item.rowKey)).every((item) => item.level === 'info')).toBe(true);
   });
 
+  it('treats only a legacy range capped at 50% as low probability', () => {
+    const rows = [
+      makeProject({ sourceKey: 'low-range', probabilityBand: '1%-50%' }),
+      makeProject({ sourceKey: 'higher-range', probabilityBand: '51%-70%' })
+    ];
+
+    const findings = evaluateRulePack(rows, today);
+
+    expect(findings.find((item) => item.rowKey === 'low-range' && item.ruleId === 'probability-observation')).toBeDefined();
+    expect(findings.find((item) => item.rowKey === 'higher-range' && item.ruleId === 'probability-observation')).toBeUndefined();
+  });
+
   it.each([
     ['2026-01-22', null],
     ['2026-01-21', '长周期项目'],

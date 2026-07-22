@@ -117,7 +117,7 @@ describe('workbook helpers', () => {
 
     expect(parsed.profile).toBe('crm-history');
     expect(parsed.validation.valid).toBe(true);
-    expect(parsed.rows[0]).toMatchObject({ projectId: 'CRM-001', unit: '万元', probabilityBand: '未知', sourceKey: 'crm-history:1', customFields: { '拜访间隔周期（天）': 31 } });
-    expect(parsed.rows[1]).toMatchObject({ projectId: '', projectName: '', status: '呆滞', probabilityBand: '未知' });
+    expect(parsed.rows[0]).toMatchObject({ projectId: 'CRM-001', unit: '万元', probabilityBand: '1%-50%', sourceKey: 'crm-history:1', customFields: { '拜访间隔周期（天）': 31 } });
+    expect(parsed.rows[1]).toMatchObject({ projectId: '', projectName: '', status: '呆滞', probabilityBand: '81%-100%' });
   });
 });

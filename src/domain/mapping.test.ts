@@ -30,6 +30,19 @@ describe('field mappings', () => {
     expect(parseProbability('无法判断')).toBe('未知');
   });
 
+  it.each([
+    ['1%-50%', '1%-50%'],
+    ['51%-70%', '51%-70%'],
+    ['71%-80%', '71%-80%'],
+    ['81%-100%', '81%-100%']
+  ])('preserves legacy probability range %s without asking for confirmation', (source, expected) => {
+    expect(parseProbability(source)).toBe(expected);
+  });
+
+  it.each(['80%-71%', '0%-101%', '-1%-50%'])('rejects invalid probability range %s', (source) => {
+    expect(parseProbability(source)).toBe('未知');
+  });
+
   it('preserves a non-empty unparseable amount for rule-level format review', () => {
     const rows = applyMappings(
       [{ 项目名称: '医院数改', 储备金额: '待确认' }],

@@ -1,5 +1,5 @@
 export type ProjectStatus = '跟进中' | '呆滞' | '已签约' | '已丢单' | '未知';
-export type ProbabilityBand = '询价类' | '未知' | `${number}%`;
+export type ProbabilityBand = '询价类' | '未知' | `${number}%` | `${number}%-${number}%`;
 
 export type CanonicalFieldKey =
   | 'projectId' | 'projectName' | 'customerName' | 'department' | 'salesManager'
@@ -38,11 +38,25 @@ export interface ProjectRow {
 export const projectKey = (row: ProjectRow) =>
   row.sourceKey || row.projectId || `${row.customerName}|${row.projectName}|${row.salesManager}`;
 
-export const probabilityPercent = (value: ProbabilityBand): number | null => {
-  if (!value.endsWith('%')) return null;
-  const parsed = Number(value.slice(0, -1));
-  return Number.isFinite(parsed) && parsed >= 0 && parsed <= 100 ? parsed : null;
+export const probabilityRange = (value: ProbabilityBand): { min: number; max: number } | null => {
+  const exact = value.match(/^(\d+(?:\.\d+)?)%$/);
+  if (exact) {
+    const percent = Number(exact[1]);
+    return Number.isFinite(percent) && percent >= 0 && percent <= 100
+      ? { min: percent, max: percent }
+      : null;
+  }
+  const range = value.match(/^(\d+(?:\.\d+)?)%-(\d+(?:\.\d+)?)%$/);
+  if (!range) return null;
+  const min = Number(range[1]);
+  const max = Number(range[2]);
+  return Number.isFinite(min) && Number.isFinite(max) && min >= 0 && min <= max && max <= 100
+    ? { min, max }
+    : null;
 };
+
+export const probabilityPercent = (value: ProbabilityBand): number | null =>
+  probabilityRange(value)?.min ?? null;
 
 export function amountInWan(row: Pick<ProjectRow, 'amount' | 'unit'>): number | null {
   if (row.amount === null || !Number.isFinite(row.amount)) return null;
