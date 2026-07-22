@@ -275,4 +275,67 @@ describe('confirmed To B rule pack', () => {
       expect.stringContaining('华城医院数字化改造方案')
     ]));
   });
+
+  it('reports blank mapped identity and ownership fields with specific Chinese names', () => {
+    const findings = evaluateRulePack([
+      makeProject({ projectId: '', projectName: ' ', customerName: '', department: '', salesManager: '' })
+    ], today, {
+      mappedFields: new Set(['projectId', 'projectName', 'customerName', 'department', 'salesManager'])
+    });
+    expect(findings.filter((item) => item.ruleId === 'field-completeness').map((item) => item.reason)).toEqual([
+      '缺少项目编号', '缺少项目名称', '缺少客户名称', '缺少部门', '缺少销售经理'
+    ]);
+  });
+
+  it('reports mapped status and probability values standardized as unknown', () => {
+    const findings = evaluateRulePack([
+      makeProject({ status: '未知', probabilityBand: '未知' })
+    ], today, { mappedFields: new Set(['status', 'probabilityBand']) });
+    expect(findings.filter((item) => item.ruleId === 'field-completeness').map((item) => item.reason)).toEqual([
+      '缺少有效项目状态', '缺少有效成单概率'
+    ]);
+  });
+
+  it('reports blank mapped extension dimensions and amount unit', () => {
+    const findings = evaluateRulePack([
+      makeProject({ industry: '', region: '', projectType: '', projectLevel: '', unit: '' })
+    ], today, {
+      mappedFields: new Set(['industry', 'region', 'projectType', 'projectLevel', 'unit'])
+    });
+    expect(findings.filter((item) => item.ruleId === 'field-completeness').map((item) => item.reason)).toEqual([
+      '缺少行业', '缺少区域/省份', '缺少项目类型', '缺少项目等级', '缺少金额单位'
+    ]);
+  });
+
+  it('does not report row-level completeness for unmapped standard columns', () => {
+    const findings = evaluateRulePack([
+      makeProject({ projectId: '', customerName: '', department: '', salesManager: '', industry: '', region: '' })
+    ], today, { mappedFields: new Set(['projectName']) });
+    expect(findings.some((item) => item.ruleId === 'field-completeness')).toBe(false);
+  });
+
+  it('leaves amount and date completeness to their dedicated rules', () => {
+    const findings = evaluateRulePack([
+      makeProject({ amount: null, createdAt: null, lastFollowUpAt: null, expectedSignAt: null })
+    ], today, {
+      mappedFields: new Set(['amount', 'unit', 'createdAt', 'lastFollowUpAt', 'expectedSignAt'])
+    });
+    expect(findings.filter((item) => item.ruleId === 'field-completeness')).toHaveLength(0);
+    expect(findings.filter((item) => item.label === '储备金额待补充')).toHaveLength(1);
+    expect(findings.filter((item) => item.label === '字段待补充')).toHaveLength(3);
+  });
+
+  it('accepts a non-empty confirmed fixed amount unit', () => {
+    const findings = evaluateRulePack([
+      makeProject({ unit: '万元' })
+    ], today, { mappedFields: new Set(['unit']) });
+    expect(findings.some((item) => item.ruleId === 'field-completeness')).toBe(false);
+  });
+
+  it('keeps latest update date optional even when the column is mapped', () => {
+    const findings = evaluateRulePack([
+      makeProject({ latestUpdatedAt: null })
+    ], today, { mappedFields: new Set(['latestUpdatedAt']) });
+    expect(findings.some((item) => item.ruleId === 'field-completeness')).toBe(false);
+  });
 });

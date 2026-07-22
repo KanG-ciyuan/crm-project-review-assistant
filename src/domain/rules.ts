@@ -55,6 +55,7 @@ const LONG_CYCLE_DAYS = 180;
 const LONG_TERM_DAYS = 365;
 
 export const RULE_DEFINITIONS: RuleDefinition[] = [
+  { id: 'field-completeness', name: '基础字段完整性', category: '数据质量待复核', requiredFields: [], adjustable: false },
   { id: 'follow-up-overdue', name: '跟进超期', category: '维护超期待整改', requiredFields: ['status', 'lastFollowUpAt'], adjustable: false },
   { id: 'signing-overdue', name: '签约日期超期未更新', category: '维护超期待整改', requiredFields: ['status', 'expectedSignAt'], adjustable: false },
   { id: 'date-created-quality', name: '创建日期完整性', category: '数据质量待复核', requiredFields: ['createdAt'], adjustable: false },
@@ -160,6 +161,47 @@ function evaluateDateQuality(row: ProjectRow): Finding[] {
       return [finding(row, ruleId, '数据质量待复核', '字段待补充', `缺少${label}`, 'review')];
     }
     return [];
+  });
+}
+
+type CompletenessField =
+  | 'projectId'
+  | 'projectName'
+  | 'customerName'
+  | 'department'
+  | 'salesManager'
+  | 'status'
+  | 'probabilityBand'
+  | 'industry'
+  | 'region'
+  | 'projectType'
+  | 'projectLevel'
+  | 'unit';
+
+const COMPLETENESS_FIELDS: Array<{
+  field: CompletenessField;
+  reason: string;
+}> = [
+  { field: 'projectId', reason: '缺少项目编号' },
+  { field: 'projectName', reason: '缺少项目名称' },
+  { field: 'customerName', reason: '缺少客户名称' },
+  { field: 'department', reason: '缺少部门' },
+  { field: 'salesManager', reason: '缺少销售经理' },
+  { field: 'status', reason: '缺少有效项目状态' },
+  { field: 'probabilityBand', reason: '缺少有效成单概率' },
+  { field: 'industry', reason: '缺少行业' },
+  { field: 'region', reason: '缺少区域/省份' },
+  { field: 'projectType', reason: '缺少项目类型' },
+  { field: 'projectLevel', reason: '缺少项目等级' },
+  { field: 'unit', reason: '缺少金额单位' }
+];
+
+function evaluateMappedFieldCompleteness(row: ProjectRow, mappedFields: Set<CanonicalFieldKey>): Finding[] {
+  return COMPLETENESS_FIELDS.flatMap(({ field, reason }) => {
+    if (!mappedFields.has(field)) return [];
+    const value = String(row[field] ?? '').trim();
+    if (value && value !== '未知') return [];
+    return [finding(row, 'field-completeness', '数据质量待复核', '字段待补充', reason, 'review')];
   });
 }
 
@@ -333,8 +375,11 @@ export interface RuleEvaluationOptions {
 }
 
 export function evaluateRulePack(rows: ProjectRow[], today: Date, options: RuleEvaluationOptions = {}): Finding[] {
+  const completenessFields = options.mappedFields
+    ?? new Set<CanonicalFieldKey>(COMPLETENESS_FIELDS.map((item) => item.field));
   const rowFindings = rows.flatMap((row) => [
     ...evaluateProbability(row),
+    ...evaluateMappedFieldCompleteness(row, completenessFields),
     ...evaluateDateQuality(row),
     ...evaluateDates(row, today),
     ...evaluateAmount(row)
