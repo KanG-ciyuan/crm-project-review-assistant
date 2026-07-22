@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, expect, it, vi } from 'vitest';
 import * as XLSX from 'xlsx';
 import App from './App';
+import { formatLocalDate } from './domain/report';
 import { loadReviewRecords, reconcileReviewRecords, saveReviewRecords, updateReviewRecord } from './domain/review';
 import * as workbookApi from './lib/workbook';
 import { makeProject } from './test/fixtures';
@@ -229,9 +230,10 @@ it('projects one global filter across metrics and result areas without changing 
   fireEvent.click(screen.getByRole('button', { name: '导出当前筛选结果' }));
   fireEvent.click(screen.getByRole('button', { name: '导出全部结果' }));
 
+  const expectedLocalDate = formatLocalDate(new Date());
   expect(downloadedNames).toEqual([
-    '储备项目经营复盘-2026-07-21-当前筛选.md',
-    '储备项目经营复盘-2026-07-21-全部.md'
+    `储备项目经营复盘-${expectedLocalDate}-当前筛选.md`,
+    `储备项目经营复盘-${expectedLocalDate}-全部.md`
   ]);
   expect(attachedDuringClick).toEqual([true, true]);
   expect(downloadedAnchors.every((anchor) => !anchor.isConnected)).toBe(true);
