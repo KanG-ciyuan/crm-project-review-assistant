@@ -138,6 +138,47 @@
   line-height: 1.5;
 }
 
+.value-mapping-summary {
+  border-block: 1px solid #e1e9e9;
+  margin-bottom: 18px;
+  padding: 16px 0;
+}
+
+.value-mapping-summary h3 {
+  font-size: 14px;
+  margin: 0 0 10px;
+}
+
+.value-mapping-summary dl,
+.value-mapping-summary ul {
+  margin: 0;
+  padding: 0;
+}
+
+.value-mapping-summary dl > div {
+  display: grid;
+  font-size: 12px;
+  gap: 12px;
+  grid-template-columns: 90px minmax(0, 1fr);
+  padding: 6px 0;
+}
+
+.value-mapping-summary dt {
+  color: #718188;
+}
+
+.value-mapping-summary dd {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.value-mapping-summary li {
+  list-style: none;
+  margin-bottom: 4px;
+  white-space: normal;
+}
+
 .threshold input:disabled {
   cursor: not-allowed;
   opacity: .7;

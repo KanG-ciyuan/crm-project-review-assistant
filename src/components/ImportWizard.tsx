@@ -49,7 +49,10 @@ const UNITS: Array<'元' | '万元' | '亿元'> = ['元', '万元', '亿元'];
 
 const presentText = (value: unknown) => value === null || value === undefined ? '' : String(value).trim();
 const isMissingFieldValue = (row: ProjectRow, field: CanonicalFieldKey) => {
-  if (field === 'amount') return row.amount === null;
+  if (field === 'amount') return row.amount === null && !row.amountParseError;
+  if (field === 'createdAt') return row.createdAt === null && !row.createdAtParseError;
+  if (field === 'lastFollowUpAt') return row.lastFollowUpAt === null && !row.lastFollowUpAtParseError;
+  if (field === 'expectedSignAt') return row.expectedSignAt === null && !row.expectedSignAtParseError;
   if (field === 'status') return row.status === '未知';
   if (field === 'probabilityBand') return row.probabilityBand === '未知';
   return !presentText(row[field]);
@@ -244,7 +247,12 @@ export function ImportWizard({ inspection, sourceNamespace, onReady, capabilitie
     {step === 4 && <div className="wizard-panel">
       <div className="wizard-heading"><div><p>第 4 步</p><h2>确认分析范围</h2></div><span>{canonicalRows.length} 条记录</span></div>
       <div className="confirmation-grid"><article><span>标准字段</span><strong>{mappings.filter((mapping) => mapping.mode === 'standard').length}</strong></article><article><span>自定义字段</span><strong>{mappings.filter((mapping) => mapping.mode === 'custom').length}</strong></article><article><span>忽略字段</span><strong>{mappings.filter((mapping) => mapping.mode === 'ignore').length}</strong></article></div>
-      <div className="confirmation-grid"><article><span>状态原值</span><strong>{statusValues.length}</strong></article><article><span>概率原值</span><strong>{probabilityValues.length}</strong></article><article><span>金额单位</span><strong>{mapsAmount ? amountUnit : '不适用'}</strong></article><article><span>字段值为空或未知</span><strong>{missingValueRowCount} 条记录</strong></article><article><span>格式异常</span><strong>{formatErrorRowCount} 条记录</strong></article></div>
+      <section className="value-mapping-summary" aria-label="已确认业务口径"><h3>已确认业务口径</h3><dl>
+        <div><dt>状态映射</dt><dd>{statusValues.length ? <ul>{statusValues.map((source) => <li key={source}>{source} → {statuses[source] || '未知/未确认'}</li>)}</ul> : '未知/未确认'}</dd></div>
+        <div><dt>概率映射</dt><dd>{probabilityValues.length ? <ul>{probabilityValues.map((source) => <li key={source}>{source} → {probabilities[source] || '未知/未确认'}</li>)}</ul> : '未知/未确认'}</dd></div>
+        <div><dt>金额单位</dt><dd>{mapsAmount ? amountUnit || '未知/未确认' : '不适用（未映射金额字段）'}</dd></div>
+      </dl></section>
+      <div className="confirmation-grid"><article><span>字段值为空或未知</span><strong>{missingValueRowCount} 条记录</strong></article><article><span>格式异常</span><strong>{formatErrorRowCount} 条记录</strong></article></div>
       <section className="capability-preview"><h3>规则执行范围</h3><ul>{ruleCapabilities.map((capability) => <li key={capability.ruleId}><b>{capability.name ?? capability.ruleId}</b><span>{capability.available ? '可执行' : `跳过：缺少${capability.missingFields.map((field) => FIELD_LABELS[field]).join('、')}`}</span></li>)}</ul></section>
       <p className="wizard-help">点击后将按已确认的字段关系和统一口径直接运行规则分析。</p>
       <div className="wizard-actions"><button className="secondary" type="button" onClick={() => returnTo(3)}>返回</button><button className="primary" type="button" onClick={finish}>开始规则分析</button></div>
