@@ -3,6 +3,7 @@ import type { CanonicalFieldKey, ProbabilityBand, ProjectStatus } from './projec
 import { readSheetRecords, type RawSheetInspection } from '../lib/workbook';
 
 export type ImportConfirmation =
+  | { kind: 'header'; candidates: number[] }
   | { kind: 'status'; source: string }
   | { kind: 'probability'; source: string }
   | { kind: 'amount-unit' };
@@ -41,21 +42,31 @@ const unitValue = (source: string): '' | '元' | '万元' | '亿元' => {
   return '';
 };
 
-function bestHeaderRow(inspection: RawSheetInspection) {
+function headerSelection(inspection: RawSheetInspection, confirmedHeaderRowIndex?: number) {
   const candidates = inspection.candidateHeaderRows.length
     ? inspection.candidateHeaderRows
     : inspection.matrix.map((_, index) => index);
-  return candidates
+  if (confirmedHeaderRowIndex !== undefined) {
+    return { headerRowIndex: confirmedHeaderRowIndex, ambiguousCandidates: [] as number[] };
+  }
+  const ranked = candidates
     .map((index) => ({
       index,
       score: suggestMappings(inspection.matrix[index].map(text))
         .filter((mapping) => mapping.mode === 'standard').length
     }))
-    .sort((left, right) => right.score - left.score || left.index - right.index)[0]?.index ?? 0;
+    .sort((left, right) => right.score - left.score || left.index - right.index);
+  const bestScore = ranked[0]?.score ?? 0;
+  const ambiguousCandidates = ranked.filter((item) => item.score === bestScore).map((item) => item.index);
+  return {
+    headerRowIndex: ranked[0]?.index ?? 0,
+    ambiguousCandidates: ambiguousCandidates.length > 1 ? ambiguousCandidates : []
+  };
 }
 
-export function diagnoseImport(inspection: RawSheetInspection, mappingOverrides?: ColumnMapping[]): ImportDiagnosis {
-  const headerRowIndex = bestHeaderRow(inspection);
+export function diagnoseImport(inspection: RawSheetInspection, mappingOverrides?: ColumnMapping[], confirmedHeaderRowIndex?: number): ImportDiagnosis {
+  const selection = headerSelection(inspection, confirmedHeaderRowIndex);
+  const headerRowIndex = selection.headerRowIndex;
   const records = readSheetRecords(inspection.matrix, headerRowIndex);
   const headers = records[0]
     ? Object.keys(records[0])
@@ -64,6 +75,10 @@ export function diagnoseImport(inspection: RawSheetInspection, mappingOverrides?
   const values: ValueMappings = { ...emptyValueMappings, statuses: {}, probabilities: {} };
   const confirmations: ImportConfirmation[] = [];
   const blockingMessages: string[] = [];
+
+  if (selection.ambiguousCandidates.length) {
+    confirmations.push({ kind: 'header', candidates: selection.ambiguousCandidates });
+  }
 
   const targetCounts = new Map<CanonicalFieldKey, number>();
   for (const mapping of mappings) {

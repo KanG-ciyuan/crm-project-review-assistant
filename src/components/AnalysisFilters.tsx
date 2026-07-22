@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { Search, X } from 'lucide-react';
 import type { AnalysisResult } from '../domain/analysis';
 import {
@@ -26,8 +26,31 @@ interface ActiveChip {
   remove: () => void;
 }
 
+const FilterMenuContext = createContext({
+  openKey: '' as string,
+  setOpenKey: (_key: string) => {}
+});
+
 export function AnalysisFilters({ analysis, filters, reviews, selectedCount, totalCount, onChange }: AnalysisFiltersProps) {
   const options = useMemo(() => buildFilterOptions(analysis, filters, reviews), [analysis, filters, reviews]);
+  const [openKey, setOpenKey] = useState('');
+  const filterRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    const closeOnOutsideClick = (event: MouseEvent) => {
+      const openMenu = filterRef.current?.querySelector('details.filter-menu[open]');
+      if (openMenu && !openMenu.contains(event.target as Node)) setOpenKey('');
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpenKey('');
+    };
+    document.addEventListener('mousedown', closeOnOutsideClick);
+    document.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.removeEventListener('mousedown', closeOnOutsideClick);
+      document.removeEventListener('keydown', closeOnEscape);
+    };
+  }, []);
 
   function setArray(key: ArrayFilterKey, values: string[]) {
     const next = { ...filters, [key]: values } as FilterState;
@@ -74,7 +97,7 @@ export function AnalysisFilters({ analysis, filters, reviews, selectedCount, tot
     });
   }
 
-  return <section className="analysis-filters" aria-label="全局项目筛选">
+  return <FilterMenuContext.Provider value={{ openKey, setOpenKey }}><section ref={filterRef} className="analysis-filters" aria-label="全局项目筛选">
     <div className="filter-topline">
       <label className="filter-search"><Search size={15} aria-hidden="true" /><span className="visually-hidden">搜索项目</span>
         <input type="search" aria-label="搜索项目" value={filters.query} placeholder="搜索项目、客户、编码或自定义字段" onChange={(event) => onChange({ ...filters, query: event.target.value })} />
@@ -89,10 +112,7 @@ export function AnalysisFilters({ analysis, filters, reviews, selectedCount, tot
       <FilterGroup title="销售经理" fieldLabel="销售经理" stateKey="salesManagers" options={options.salesManagers} selected={filters.salesManagers} onToggle={(value) => toggleArray('salesManagers', value)} onAll={() => setArray('salesManagers', options.salesManagers.map((item) => item.value))} onClear={() => setArray('salesManagers', [])} onOnly={(value) => setArray('salesManagers', [value])} />
       <FilterGroup title="项目状态" fieldLabel="项目状态" stateKey="statuses" options={options.statuses} selected={filters.statuses} onToggle={(value) => toggleArray('statuses', value)} onAll={() => setArray('statuses', options.statuses.map((item) => item.value))} onClear={() => setArray('statuses', [])} />
       <FilterGroup title="成单概率" fieldLabel="成单概率" stateKey="probabilityBands" options={options.probabilityBands} selected={filters.probabilityBands} onToggle={(value) => toggleArray('probabilityBands', value)} onAll={() => setArray('probabilityBands', options.probabilityBands.map((item) => item.value))} onClear={() => setArray('probabilityBands', [])} />
-      <FilterGroup title="金额" fieldLabel="金额等级" stateKey="amountBands" options={options.amountBands} selected={filters.amountBands} onToggle={(value) => toggleArray('amountBands', value)} onAll={() => setArray('amountBands', options.amountBands.map((item) => item.value))} onClear={() => setArray('amountBands', [])} extra={<div className="amount-range">
-        <label>最低金额（万元）<input aria-label="最低金额（万元）" type="number" min="0" value={filters.amountMinWan ?? ''} onChange={(event) => onChange({ ...filters, amountMinWan: numberOrNull(event.target.value) })} /></label>
-        <label>最高金额（万元）<input aria-label="最高金额（万元）" type="number" min="0" value={filters.amountMaxWan ?? ''} onChange={(event) => onChange({ ...filters, amountMaxWan: numberOrNull(event.target.value) })} /></label>
-      </div>} />
+      <FilterGroup title="金额" fieldLabel="金额等级" stateKey="amountBands" options={options.amountBands} selected={filters.amountBands} onToggle={(value) => toggleArray('amountBands', value)} onAll={() => setArray('amountBands', options.amountBands.map((item) => item.value))} onClear={() => setArray('amountBands', [])} extra={<AmountRangeFields filters={filters} onChange={onChange} />} />
       <FilterGroup title="跟进周期" fieldLabel="跟进周期" stateKey="followUpBands" options={options.followUpBands} selected={filters.followUpBands} onToggle={(value) => toggleArray('followUpBands', value)} onAll={() => setArray('followUpBands', options.followUpBands.map((item) => item.value))} onClear={() => setArray('followUpBands', [])} />
       <FilterGroup title="储备周期" fieldLabel="储备周期" stateKey="reserveCycleBands" options={options.reserveCycleBands} selected={filters.reserveCycleBands} onToggle={(value) => toggleArray('reserveCycleBands', value)} onAll={() => setArray('reserveCycleBands', options.reserveCycleBands.map((item) => item.value))} onClear={() => setArray('reserveCycleBands', [])} />
       <FilterGroup title="结果分类" fieldLabel="结果分类" stateKey="categories" options={options.categories} selected={filters.categories} onToggle={(value) => toggleArray('categories', value)} onAll={() => setArray('categories', options.categories.map((item) => item.value))} onClear={() => setArray('categories', [])} />
@@ -108,13 +128,24 @@ export function AnalysisFilters({ analysis, filters, reviews, selectedCount, tot
     {chips.length > 0 && <div className="active-filters" aria-label="已选筛选条件">
       {chips.map((chip) => <span className="filter-chip" key={chip.key}>{chip.label}<button type="button" aria-label={`移除筛选：${chip.label}`} onClick={chip.remove}><X size={13} /></button></span>)}
     </div>}
-  </section>;
+  </section></FilterMenuContext.Provider>;
 }
 
 function numberOrNull(value: string) {
   if (value.trim() === '') return null;
   const parsed = Number(value);
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+}
+
+function AmountRangeFields({ filters, onChange }: { filters: FilterState; onChange: (filters: FilterState) => void }) {
+  const { setOpenKey } = useContext(FilterMenuContext);
+  const closeOnEnter = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Enter') setOpenKey('');
+  };
+  return <div className="amount-range">
+    <label>最低金额（万元）<input aria-label="最低金额（万元）" type="number" min="0" value={filters.amountMinWan ?? ''} onChange={(event) => onChange({ ...filters, amountMinWan: numberOrNull(event.target.value) })} onBlur={() => setOpenKey('')} onKeyDown={closeOnEnter} /></label>
+    <label>最高金额（万元）<input aria-label="最高金额（万元）" type="number" min="0" value={filters.amountMaxWan ?? ''} onChange={(event) => onChange({ ...filters, amountMaxWan: numberOrNull(event.target.value) })} onBlur={() => setOpenKey('')} onKeyDown={closeOnEnter} /></label>
+  </div>;
 }
 
 function FilterGroup({ title, fieldLabel, stateKey, options, selected, onToggle, onAll, onClear, onOnly, extra }: {
@@ -129,9 +160,13 @@ function FilterGroup({ title, fieldLabel, stateKey, options, selected, onToggle,
   onOnly?: (value: string) => void;
   extra?: React.ReactNode;
 }) {
-  const [open, setOpen] = useState(false);
-  const applyAndClose = (action: () => void) => { action(); setOpen(false); };
-  return <details className="filter-menu" open={open} onToggle={(event) => setOpen(event.currentTarget.open)}>
+  const { openKey, setOpenKey } = useContext(FilterMenuContext);
+  const open = openKey === stateKey;
+  const applyAndClose = (action: () => void) => { action(); setOpenKey(''); };
+  return <details className="filter-menu" open={open} onToggle={(event) => {
+    if (event.currentTarget.open) setOpenKey(stateKey);
+    else if (open) setOpenKey('');
+  }}>
     <summary>{title}{selected.length > 0 && <b>{selected.length}</b>}</summary>
     <div className="filter-popover" role="group" aria-label={`${fieldLabel}筛选选项`}>
       <div className="filter-menu-actions"><button type="button" onClick={() => applyAndClose(onAll)}>全选{fieldLabel}</button><button type="button" onClick={() => applyAndClose(onClear)}>清空{fieldLabel}</button></div>
@@ -147,9 +182,14 @@ function FilterGroup({ title, fieldLabel, stateKey, options, selected, onToggle,
 }
 
 function CustomFilterGroup({ field, values, selected, onChange }: { field: string; values: string[]; selected: string[]; onChange: (values: string[]) => void }) {
-  const [open, setOpen] = useState(false);
-  const applyAndClose = (next: string[]) => { onChange(next); setOpen(false); };
-  return <details className="filter-menu" open={open} onToggle={(event) => setOpen(event.currentTarget.open)}>
+  const { openKey, setOpenKey } = useContext(FilterMenuContext);
+  const menuKey = `custom:${field}`;
+  const open = openKey === menuKey;
+  const applyAndClose = (next: string[]) => { onChange(next); setOpenKey(''); };
+  return <details className="filter-menu" open={open} onToggle={(event) => {
+    if (event.currentTarget.open) setOpenKey(menuKey);
+    else if (open) setOpenKey('');
+  }}>
     <summary>{field}{selected.length > 0 && <b>{selected.length}</b>}</summary>
     <div className="filter-popover" role="group" aria-label={`${field}筛选选项`}>
       <div className="filter-menu-actions"><button type="button" onClick={() => applyAndClose(values)}>全选{field}</button><button type="button" onClick={() => applyAndClose([])}>清空{field}</button></div>

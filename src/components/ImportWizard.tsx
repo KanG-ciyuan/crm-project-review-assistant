@@ -41,16 +41,24 @@ const STANDARD_FIELDS = Object.entries(FIELD_LABELS) as Array<[CanonicalFieldKey
 
 export function ImportWizard({ inspection, sourceNamespace, onReady, capabilities, onConfigurationChange }: ImportWizardProps) {
   const initialDiagnosis = useMemo(() => diagnoseImport(inspection), [inspection]);
+  const [confirmedHeaderRowIndex, setConfirmedHeaderRowIndex] = useState<number | null>(
+    initialDiagnosis.confirmations.some((item) => item.kind === 'header') ? null : initialDiagnosis.headerRowIndex
+  );
   const [mappings, setMappings] = useState<ColumnMapping[]>(initialDiagnosis.mappings);
-  const diagnosis = useMemo(() => diagnoseImport(inspection, mappings), [inspection, mappings]);
+  const diagnosis = useMemo(
+    () => diagnoseImport(inspection, mappings, confirmedHeaderRowIndex ?? undefined),
+    [confirmedHeaderRowIndex, inspection, mappings]
+  );
   const [statusResolutions, setStatusResolutions] = useState<Record<string, ProjectStatus | ''>>({});
   const [probabilityResolutions, setProbabilityResolutions] = useState<Record<string, string>>({});
   const [amountUnit, setAmountUnit] = useState<ValueMappings['amountUnit']>(diagnosis.valueMappings.amountUnit);
   const [message, setMessage] = useState('');
 
+  const unresolvedHeaders = diagnosis.confirmations.filter((item) => item.kind === 'header');
   const unresolvedStatuses = diagnosis.confirmations.filter((item) => item.kind === 'status');
   const unresolvedProbabilities = diagnosis.confirmations.filter((item) => item.kind === 'probability');
   const needsAmountUnit = diagnosis.confirmations.some((item) => item.kind === 'amount-unit');
+  const effectiveAmountUnit = amountUnit || diagnosis.valueMappings.amountUnit;
   const mappedFields = new Set(diagnosis.mappings
     .filter((mapping): mapping is ColumnMapping & { targetField: CanonicalFieldKey } => mapping.mode === 'standard' && Boolean(mapping.targetField))
     .map((mapping) => mapping.targetField));
@@ -58,6 +66,7 @@ export function ImportWizard({ inspection, sourceNamespace, onReady, capabilitie
   const ruleCapabilities = capabilities ?? getRuleCapabilities(mappedFields);
 
   const canStart = diagnosis.state !== 'blocked'
+    && unresolvedHeaders.length === 0
     && unresolvedStatuses.every((item) => Boolean(statusResolutions[item.source]))
     && unresolvedProbabilities.every((item) => {
       const value = probabilityResolutions[item.source]?.trim();
@@ -65,7 +74,7 @@ export function ImportWizard({ inspection, sourceNamespace, onReady, capabilitie
       const numeric = Number(value);
       return value !== '' && Number.isFinite(numeric) && numeric >= 0 && numeric <= 100;
     })
-    && (!needsAmountUnit || Boolean(amountUnit));
+    && (!needsAmountUnit || Boolean(effectiveAmountUnit));
 
   function finish() {
     if (!canStart) {
@@ -83,7 +92,7 @@ export function ImportWizard({ inspection, sourceNamespace, onReady, capabilitie
         ...Object.fromEntries(Object.entries(statusResolutions).filter((entry): entry is [string, ProjectStatus] => Boolean(entry[1])))
       },
       probabilities,
-      amountUnit
+      amountUnit: effectiveAmountUnit
     };
     onReady({
       rows: applyMappings(diagnosis.records, diagnosis.mappings, valueMappings, inspection.sheetName, sourceNamespace),
@@ -106,6 +115,20 @@ export function ImportWizard({ inspection, sourceNamespace, onReady, capabilitie
     {diagnosis.blockingMessages.map((item) => <div className="import-blocker" role="alert" key={item}><strong>{item}</strong><p>请先在 Excel 中统一后重新导入。</p></div>)}
 
     {diagnosis.confirmations.length > 0 && <div className="confirmation-list">
+      {unresolvedHeaders.map((item) => <label className="confirmation-row" key="header-row">
+        <span><b>表头行</b><small>请选择包含字段名称的行</small></span>
+        <select aria-label="表头行" value="" onChange={(event) => {
+          const nextHeaderRowIndex = Number(event.target.value);
+          const nextDiagnosis = diagnoseImport(inspection, undefined, nextHeaderRowIndex);
+          setConfirmedHeaderRowIndex(nextHeaderRowIndex);
+          setMappings(nextDiagnosis.mappings);
+          setStatusResolutions({});
+          setProbabilityResolutions({});
+          setAmountUnit(nextDiagnosis.valueMappings.amountUnit);
+          setMessage('');
+          onConfigurationChange?.();
+        }}><option value="">请选择</option>{item.candidates.map((index) => <option value={index} key={index}>第 {index + 1} 行：{inspection.matrix[index].map((value) => String(value ?? '').trim()).filter(Boolean).slice(0, 4).join('、')}</option>)}</select>
+      </label>)}
       {unresolvedStatuses.map((item) => <label className="confirmation-row" key={`status:${item.source}`}>
         <span><b>项目状态</b><small>原值：{item.source}</small></span>
         <select aria-label={`${item.source}对应状态`} value={statusResolutions[item.source] ?? ''} onChange={(event) => {
@@ -135,14 +158,21 @@ export function ImportWizard({ inspection, sourceNamespace, onReady, capabilitie
         return <label key={mapping.sourceHeader}><span>{mapping.sourceHeader}</span><select aria-label={`${mapping.sourceHeader}字段对应`} value={value} onChange={(event) => {
           const nextValue = event.target.value;
           setMappings((current) => current.map((item, itemIndex) => itemIndex !== index ? item
-            : nextValue === '__custom__' ? { sourceHeader: item.sourceHeader, mode: 'custom', customName: item.sourceHeader }
+            : nextValue === '__custom__' ? { sourceHeader: item.sourceHeader, mode: 'custom', customName: item.mode === 'custom' ? item.customName : item.sourceHeader }
               : nextValue === '__ignore__' ? { sourceHeader: item.sourceHeader, mode: 'ignore' }
                 : { sourceHeader: item.sourceHeader, mode: 'standard', targetField: nextValue as CanonicalFieldKey }));
           setStatusResolutions({});
           setProbabilityResolutions({});
           setMessage('');
           onConfigurationChange?.();
-        }}><option value="__custom__">保留为自定义字段</option><option value="__ignore__">忽略此列</option>{STANDARD_FIELDS.map(([field, label]) => <option key={field} value={field}>{label}</option>)}</select></label>;
+        }}><option value="__custom__">保留为自定义字段</option><option value="__ignore__">忽略此列</option>{STANDARD_FIELDS.map(([field, label]) => <option key={field} value={field}>{label}</option>)}</select>
+          {mapping.mode === 'custom' && <input aria-label={`${mapping.sourceHeader}自定义名称`} value={mapping.customName} onChange={(event) => {
+            const customName = event.target.value;
+            setMappings((current) => current.map((item, itemIndex) => itemIndex === index && item.mode === 'custom' ? { ...item, customName } : item));
+            setMessage('');
+            onConfigurationChange?.();
+          }} />}
+        </label>;
       })}</div></section>
       <section className="capability-preview"><h3>规则执行范围</h3><ul>{ruleCapabilities.map((capability) => <li key={capability.ruleId}><b>{capability.name ?? capability.ruleId}</b><span>{capability.available ? '可执行' : `跳过：缺少${capability.missingFields.map((field) => FIELD_LABELS[field] ?? field).join('、')}`}</span></li>)}</ul></section>
     </details>

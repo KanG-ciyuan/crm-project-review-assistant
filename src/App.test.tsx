@@ -138,6 +138,27 @@ it('runs a simple workbook through the smart import path', async () => {
   expect(screen.getByRole('heading', { name: '数据质量待复核' })).toBeInTheDocument();
 });
 
+it('keeps review input visible and offers retry when browser storage fails', async () => {
+  const user = userEvent.setup();
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([
+    ['项目编号', '项目名称', '储备金额', '金额单位'],
+    ['SAVE-1', '待保存项目', 0, '万元']
+  ]), '商机表');
+  vi.spyOn(workbookApi, 'inspectWorkbook').mockResolvedValue({ workbook, sheetNames: ['商机表'] });
+  vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('quota'); });
+
+  render(<App />);
+  await user.upload(screen.getByLabelText('选择 .xlsx 文件'), new File(['content'], '商机.xlsx'));
+  await user.click(await screen.findByRole('button', { name: '开始分析' }));
+  const status = screen.getByLabelText('SAVE-1 审查状态');
+  await user.selectOptions(status, '确认数据错误');
+
+  expect(status).toHaveValue('确认数据错误');
+  expect(screen.getByRole('alert')).toHaveTextContent('自动保存失败');
+  expect(screen.getByRole('button', { name: '重试保存' })).toBeInTheDocument();
+});
+
 it('runs the confirmed 30-day rule pack and removes the legacy percentile rule', async () => {
   const user = userEvent.setup();
   const workbook = XLSX.utils.book_new();

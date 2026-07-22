@@ -1,8 +1,22 @@
 import { describe, expect, it } from 'vitest';
 import * as XLSX from 'xlsx';
+import { diagnoseImport } from '../domain/importDiagnosis';
 import { findHeaderRow, inspectSheet, parseSelectedSheet, readSheetRecords, validateHeaders } from './workbook';
 
 describe('workbook helpers', () => {
+  it('preserves percentage-formatted numeric cells for exact probability recognition', () => {
+    const worksheet = XLSX.utils.aoa_to_sheet([
+      ['项目名称', '成单概率'],
+      ['医院数改', 1]
+    ]);
+    worksheet.B2.z = '0%';
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, '商机明细');
+
+    const inspected = inspectSheet(workbook, '商机明细');
+    expect(inspected.matrix[1][1]).toBe('100%');
+  });
+
   it('returns candidate header rows without requiring known column names', () => {
     const workbook = XLSX.utils.book_new();
     const sheet = XLSX.utils.aoa_to_sheet([
@@ -50,7 +64,7 @@ describe('workbook helpers', () => {
   });
 
   it('reads the legacy CRM history sample without fixed-profile parsing', () => {
-    const workbook = XLSX.readFile('sample-data/CRM历史项目表-脱敏适配样表.xlsx', { cellDates: true });
+    const workbook = XLSX.readFile('public/CRM历史项目表-脱敏适配样表.xlsx', { cellDates: true, cellNF: true });
     const inspected = inspectSheet(workbook, '10-储备项目报备表（跟进中和呆滞）');
     const headerRowIndex = inspected.matrix.findIndex((row) => row.includes('项目编码'));
     const records = readSheetRecords(inspected.matrix, headerRowIndex);
@@ -58,6 +72,9 @@ describe('workbook helpers', () => {
     expect(records.length).toBeGreaterThan(0);
     expect(records[0]).toHaveProperty('项目编码');
     expect(records[0]).toHaveProperty('储备金额（万元）');
+    const diagnosis = diagnoseImport(inspected);
+    expect(diagnosis.confirmations.filter((item) => item.kind === 'probability')).toEqual([]);
+    expect(diagnosis.valueMappings.probabilities).toMatchObject({ '80%': '80%', '30%': '30%', '90%': '90%' });
   });
 
   it('finds the standard header after a title row', () => {

@@ -25,6 +25,7 @@ describe('field mappings', () => {
   it('keeps ambiguous or invalid probabilities unresolved', () => {
     expect(parseProbability(1)).toBe('未知');
     expect(parseProbability(101)).toBe('未知');
+    expect(parseProbability('100.1%')).toBe('未知');
     expect(parseProbability(-1)).toBe('未知');
     expect(parseProbability('无法判断')).toBe('未知');
   });

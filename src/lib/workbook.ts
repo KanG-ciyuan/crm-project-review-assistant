@@ -70,7 +70,7 @@ const pick = (source: Record<string, unknown>, header: string) => source[header]
 
 export async function inspectWorkbook(file: File): Promise<WorkbookInspection> {
   if (!file.name.toLowerCase().endsWith('.xlsx')) throw new Error('请选择 .xlsx 格式的标准 Excel 文件');
-  const workbook = XLSX.read(await file.arrayBuffer(), { type: 'array', cellDates: true });
+  const workbook = XLSX.read(await file.arrayBuffer(), { type: 'array', cellDates: true, cellNF: true });
   if (workbook.SheetNames.length === 0) throw new Error('该文件不包含可读取的工作表');
   return { workbook, sheetNames: workbook.SheetNames };
 }
@@ -84,6 +84,16 @@ export function inspectSheet(workbook: XLSX.WorkBook, sheetName: string): RawShe
     defval: null,
     raw: true
   });
+  const range = XLSX.utils.decode_range(worksheet['!ref'] ?? 'A1');
+  for (let row = range.s.r; row <= range.e.r; row += 1) {
+    for (let column = range.s.c; column <= range.e.c; column += 1) {
+      const cell = worksheet[XLSX.utils.encode_cell({ r: row, c: column })];
+      if (cell?.t === 'n' && typeof cell.z === 'string' && cell.z.includes('%')) {
+        if (!matrix[row]) matrix[row] = [];
+        matrix[row][column] = XLSX.SSF.format(cell.z, cell.v);
+      }
+    }
+  }
   const firstTenNonEmptyRows = matrix
     .map((row, index) => ({ row, index }))
     .filter(({ row }) => row.some(isPresent))

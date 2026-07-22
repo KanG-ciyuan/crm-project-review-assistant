@@ -40,6 +40,25 @@ describe('AnalysisFilters', () => {
     expect(screen.getByText('部门：华东一部')).toBeInTheDocument();
   });
 
+  it('keeps only one filter menu open and closes it on outside click or Escape', async () => {
+    const user = userEvent.setup();
+    render(<FilterHarness />);
+
+    const departmentMenu = screen.getByText('部门').closest('details')!;
+    const sellerMenu = screen.getByText('销售经理').closest('details')!;
+    await user.click(screen.getByText('部门'));
+    await user.click(screen.getByText('销售经理'));
+    expect(departmentMenu).not.toHaveAttribute('open');
+    expect(sellerMenu).toHaveAttribute('open');
+
+    await user.keyboard('{Escape}');
+    expect(sellerMenu).not.toHaveAttribute('open');
+
+    await user.click(screen.getByText('部门'));
+    await user.click(screen.getByRole('searchbox', { name: '搜索项目' }));
+    expect(departmentMenu).not.toHaveAttribute('open');
+  });
+
   it('hides unmapped extension filters and shows a mapped-but-empty extension field', () => {
     const row = makeProject({ sourceKey: 'one', industry: '' });
     const hidden = buildAnalysis([row], [], today, ['projectName']);

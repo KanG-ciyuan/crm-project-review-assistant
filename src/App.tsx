@@ -25,6 +25,7 @@ export default function App() {
   const [currentReport, setCurrentReport] = useState('');
   const [error, setError] = useState('');
   const [reviewRecords, setReviewRecords] = useState<ReviewRecordMap>(() => loadReviewRecords(window.localStorage));
+  const [storageError, setStorageError] = useState('');
   const [feedbackCopied, setFeedbackCopied] = useState(false);
 
   const sheetInspection = useMemo(() => inspection && sheetName ? inspectSheet(inspection.workbook, sheetName) : null, [inspection, sheetName]);
@@ -50,6 +51,15 @@ export default function App() {
   useEffect(() => {
     setCurrentReport(generatedCurrentReport);
   }, [generatedCurrentReport]);
+
+  function persistReviews(records: ReviewRecordMap) {
+    try {
+      saveReviewRecords(records, window.localStorage);
+      setStorageError('');
+    } catch {
+      setStorageError('处理结果暂时无法保存到浏览器。当前输入已保留，请检查浏览器存储空间后重试。');
+    }
+  }
 
   async function onFileChange(file: File | null) {
     if (!file) return;
@@ -88,7 +98,7 @@ export default function App() {
     const result = buildAnalysis(payload.rows, nextFindings, now, [...mappedFields]);
     const reviewKeys = [...new Set(nextFindings.filter((finding) => finding.level === 'review' || finding.level === 'action').map((finding) => finding.rowKey))];
     const nextReviews = reconcileReviewRecords(result.rows, reviewKeys, reviewRecords, now);
-    saveReviewRecords(nextReviews, window.localStorage);
+    persistReviews(nextReviews);
     setAnalysis(result);
     setFilters(EMPTY_FILTERS);
     setImportReady(payload);
@@ -117,8 +127,8 @@ export default function App() {
       status: patch.status ?? current.status,
       note: patch.note ?? current.note
     }, now);
-    saveReviewRecords(next, window.localStorage);
     setReviewRecords(next);
+    persistReviews(next);
   }
 
   function downloadReport(report: string, suffix: '当前筛选' | '全部') {
@@ -168,6 +178,7 @@ export default function App() {
       {sheetInspection && !confirmedSourceNamespace && <section className="notice" role="alert"><h2>需要数据来源标识</h2><p>请填写数据来源标识后继续导入。</p></section>}
       {sheetInspection && confirmedSourceNamespace && <ImportWizard key={`${importRevision}:${fileName}:${sheetName}:${sourceNamespace}`} inspection={sheetInspection} sourceNamespace={confirmedSourceNamespace} onReady={startAnalysis} onConfigurationChange={clearImportedAnalysis} />}
       {analysis && visibleAnalysis && <>
+        {storageError && <section className="notice storage-notice" role="alert"><h2>自动保存失败</h2><p>{storageError}</p><button type="button" className="secondary" onClick={() => persistReviews(reviewRecords)}>重试保存</button></section>}
         <AnalysisFilters analysis={analysis} filters={filters} reviews={reviewRecords} selectedCount={selectedKeys.size} totalCount={analysis.rows.length} onChange={setFilters} />
         <AnalysisResults analysis={visibleAnalysis} reviews={reviewRecords} onChangeReview={changeReview} />
         <section className="report-card"><div className="table-heading"><div><h2>经营复盘草稿</h2><p>当前 {visibleAnalysis.rows.length} / 全部 {analysis.rows.length} 个项目</p><p>筛选范围：{filterScope.length > 0 ? filterScope.join('；').replace(/[\r\n\t]+/g, ' ').replace(/\|/g, '/') : '全部项目'}</p></div><div><button className="secondary" onClick={() => downloadReport(currentReport, '当前筛选')} disabled={!currentReport.trim()}><Download size={15} /> 导出当前筛选结果</button> <button className="secondary" onClick={() => downloadReport(allReport, '全部')} disabled={!allReport.trim()}><Download size={15} /> 导出全部结果</button></div></div><textarea value={currentReport} onChange={(event) => setCurrentReport(event.target.value)} aria-label="经营复盘草稿" /></section>

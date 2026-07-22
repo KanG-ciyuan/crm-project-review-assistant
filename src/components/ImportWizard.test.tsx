@@ -90,6 +90,23 @@ describe('ImportWizard smart path', () => {
     expect(onReady.mock.calls[0][0]).toMatchObject({ source: { headerRowIndex: 1 } });
   });
 
+  it('asks only for the header row when two candidates have the same recognition score', async () => {
+    const user = userEvent.setup();
+    const onReady = vi.fn();
+    render(<ImportWizard inspection={inspection([
+      ['项目名称', '部门'],
+      ['商机名称', '所属部门'],
+      ['医院数改', '华东部']
+    ], [0, 1, 2])} onReady={onReady} />);
+
+    expect(screen.getByLabelText('表头行')).toBeInTheDocument();
+    await user.selectOptions(screen.getByLabelText('表头行'), '1');
+    await user.click(screen.getByRole('button', { name: '开始分析' }));
+
+    expect(onReady.mock.calls[0][0]).toMatchObject({ source: { headerRowIndex: 1 } });
+    expect(onReady.mock.calls[0][0].rows[0]).toMatchObject({ projectName: '医院数改', department: '华东部' });
+  });
+
   it('keeps recognition details collapsed and exposes skipped rule reasons on demand', async () => {
     const user = userEvent.setup();
     render(<ImportWizard inspection={inspection([
@@ -117,5 +134,36 @@ describe('ImportWizard smart path', () => {
     await user.click(screen.getByRole('button', { name: '开始分析' }));
 
     expect(onReady.mock.calls[0][0].rows[0]).toMatchObject({ projectName: '医院数改', salesManager: '销售甲' });
+  });
+
+  it('syncs the inferred unit after an advanced user maps an amount column', async () => {
+    const user = userEvent.setup();
+    const onReady = vi.fn();
+    render(<ImportWizard inspection={inspection([
+      ['项目名称', '合同规模（万元）'],
+      ['医院数改', 1200]
+    ])} onReady={onReady} />);
+
+    await user.click(screen.getByText('查看识别详情'));
+    await user.selectOptions(screen.getByLabelText('合同规模（万元）字段对应'), 'amount');
+    await user.click(screen.getByRole('button', { name: '开始分析' }));
+
+    expect(onReady.mock.calls[0][0].rows[0]).toMatchObject({ amount: 1200, unit: '万元' });
+  });
+
+  it('lets advanced users rename a retained custom field', async () => {
+    const user = userEvent.setup();
+    const onReady = vi.fn();
+    render(<ImportWizard inspection={inspection([
+      ['项目名称', '我司备注'],
+      ['医院数改', '等待预算']
+    ])} onReady={onReady} />);
+
+    await user.click(screen.getByText('查看识别详情'));
+    await user.clear(screen.getByLabelText('我司备注自定义名称'));
+    await user.type(screen.getByLabelText('我司备注自定义名称'), '跟进备注');
+    await user.click(screen.getByRole('button', { name: '开始分析' }));
+
+    expect(onReady.mock.calls[0][0].rows[0].customFields).toEqual({ 跟进备注: '等待预算' });
   });
 });
