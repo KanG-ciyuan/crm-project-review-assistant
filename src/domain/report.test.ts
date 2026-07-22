@@ -1,60 +1,159 @@
 import { describe, expect, it } from 'vitest';
-import { createReviewReport } from './report';
-import type { AnalysisResult } from './analyze';
+import { makeProject } from '../test/fixtures';
+import { buildAnalysis } from './analysis';
+import { createReviewReport, formatLocalDate } from './report';
+import type { Finding } from './rules';
 import type { ReviewRecordMap } from './review';
 
-const analysis: AnalysisResult = {
-  rows: [],
-  issues: [
-    { projectId: 'P-2026-024', projectName: '远景综合管廊项目', department: '营销三部', salesManager: '示例经理丙', amount: 50000, category: '数据质量', label: '金额需复核', reason: '超过本次复核上限', status: '待人工确认' },
-    { projectId: 'P-2026-025', projectName: '云川河道治理项目', department: '营销一部', salesManager: '示例经理甲', amount: 290, category: '经营风险', label: '跟进停滞', reason: '距离最近拜访已超过 14 天', status: '待跟进' },
-    { projectId: 'P-2026-026', projectName: '星港轨道维保项目', department: '营销一部', salesManager: '示例经理甲', amount: 480, category: '数据质量', label: '疑似重复报备', reason: '项目编号重复', status: '待人工确认' }
-  ],
-  overview: { projectCount: 30, totalAmountWan: 8462, inProgressCount: 13, signedCount: 9, lostCount: 8, riskProjectCount: 10 },
-  byDepartment: [],
-  bySalesManager: [],
-  manualStagnationProjects: [],
-  observationProjects: []
-};
-
+const row = makeProject({ sourceKey: 'row-24', projectId: 'P-2026-024', projectName: '远景综合管廊项目' });
+const reportDate = new Date(2026, 6, 16, 12);
+const findings: Finding[] = [
+  { ruleId: 'amount', rowKey: 'row-24', projectId: row.projectId, projectName: row.projectName, customerName: row.customerName, department: row.department, salesManager: row.salesManager, amountWan: 50000, category: '数据质量待复核', label: '金额需复核', reason: '超过本次复核上限', level: 'review' },
+  { ruleId: 'reserve', rowKey: 'row-24', projectId: row.projectId, projectName: row.projectName, customerName: row.customerName, department: row.department, salesManager: row.salesManager, amountWan: 50000, category: '经营结构分析', label: '长周期项目', reason: '仅用于经营观察', level: 'info' }
+];
+const analysis = buildAnalysis([row], findings, reportDate);
 const reviews: ReviewRecordMap = {
-  'P-2026-024': { projectId: 'P-2026-024', projectName: '远景综合管廊项目', status: '确认数据错误', note: '已通知销售修正金额。', firstReviewedAt: '2026-07-17T09:00:00.000Z', lastReviewedAt: '2026-07-17T09:00:00.000Z', fingerprint: 'x', dataUpdated: false, history: [] },
-  'P-2026-025': { projectId: 'P-2026-025', projectName: '云川河道治理项目', status: '确认业务风险', note: '安排本周拜访。', firstReviewedAt: '2026-07-17T09:00:00.000Z', lastReviewedAt: '2026-07-17T09:00:00.000Z', fingerprint: 'y', dataUpdated: false, history: [] },
-  'P-2026-026': { projectId: 'P-2026-026', projectName: '星港轨道维保项目', status: '已忽略', note: '已在专项流程处理。', firstReviewedAt: '2026-07-17T09:00:00.000Z', lastReviewedAt: '2026-07-17T09:00:00.000Z', fingerprint: 'z', dataUpdated: false, history: [] }
+  'row-24': { projectId: row.projectId, projectName: row.projectName, status: '确认数据错误', note: '已通知销售修正金额。', firstReviewedAt: '2026-07-17T09:00:00.000Z', lastReviewedAt: '2026-07-17T09:00:00.000Z', fingerprint: 'x', dataUpdated: false, history: [] }
 };
 
 describe('createReviewReport', () => {
-  it('includes the fixed human-confirmation disclaimer and key sections', () => {
-    const report = createReviewReport(analysis, {}, new Date('2026-07-16'));
+  it('includes the fixed disclaimer and five result sections', () => {
+    const report = createReviewReport(analysis, {}, reportDate);
     expect(report).toContain('金额、日期、项目状态及业务结论须由业务人员确认');
-    expect(report).toContain('## 重点风险项目摘要');
+    for (const heading of ['数据质量待复核', '维护超期待整改', '疑似重复与撞单', '重点项目复盘', '经营结构分析']) {
+      expect(report).toContain(`## ${heading}`);
+    }
     expect(report).toContain('P-2026-024');
+    expect(report).toContain('经营观察');
   });
 
-  it('adds grouped human-review progress while keeping the confirmation disclaimer', () => {
-    const report = createReviewReport(analysis, reviews, new Date('2026-07-16'));
-
+  it('adds grouped human-review progress by project row key', () => {
+    const report = createReviewReport(analysis, reviews, reportDate);
     expect(report).toContain('## 审查处理进度');
     expect(report).toContain('已通知销售修正金额。');
-    expect(report).toContain('安排本周拜访。');
-    expect(report).toContain('本期已忽略 1 个项目');
     expect(report).toContain('金额、日期、项目状态及业务结论须由业务人员确认');
   });
 
-  it('separates manual stagnation and low-probability observations from the risk summary', () => {
-    const manualStagnation = { projectId: 'CRM-002', projectName: '云川仓储升级项目', department: '华南业务部', salesManager: '示例经理乙', status: '呆滞' as const, amount: 1200, unit: '万元', createdAt: '2026-03-02', lastVisitAt: '2026-04-01', expectedSignAt: '2026-09-30', probability: null, inputProfile: 'crm-history' as const };
-    const observation = { projectId: 'CRM-005', projectName: '北原综合管廊项目', department: '华东业务部', salesManager: '示例经理甲', status: '跟进中' as const, amount: 1850, unit: '万元', createdAt: '2026-04-26', lastVisitAt: '2026-07-05', expectedSignAt: '2026-11-10', probability: null, inputProfile: 'crm-history' as const };
-    const crmAnalysis: AnalysisResult = {
-      ...analysis,
-      rows: [manualStagnation, observation],
-      manualStagnationProjects: [manualStagnation],
-      observationProjects: [observation]
+  it('writes a markdown-safe active filter scope immediately after the generated date', () => {
+    const report = createReviewReport(analysis, {}, reportDate, [
+      '部门：华东\n一部',
+      '标签：跟进 | 超期'
+    ]);
+
+    expect(report).toContain('生成日期：2026-07-16\n\n筛选范围：部门：华东 一部；标签：跟进 &#124; 超期');
+    expect(report).not.toContain('筛选范围：部门：华东\n一部');
+  });
+
+  it('only reports rows and actionable review progress from the projected analysis', () => {
+    const hidden = makeProject({ sourceKey: 'row-hidden', projectId: 'P-HIDDEN', projectName: '不应泄漏项目' });
+    const visibleAction: Finding = {
+      ...findings[0], rowKey: row.sourceKey, projectId: row.projectId, projectName: row.projectName,
+      category: '维护超期待整改', label: '跟进超期', level: 'action'
     };
-    const report = createReviewReport(crmAnalysis, {}, new Date('2026-07-16'));
-    expect(report).toContain('## 已手动标记呆滞');
-    expect(report).toContain('## 低概率重点项目');
-    expect(report).toContain('不计入经营风险项目数');
-    expect(report).toContain('手动标记呆滞 1 个');
-    expect(report).not.toContain('已签约 9 个');
+    const projected = buildAnalysis([row], [visibleAction, findings[1]], reportDate);
+    const mixedReviews: ReviewRecordMap = {
+      ...reviews,
+      [hidden.sourceKey]: {
+        projectId: hidden.projectId, projectName: hidden.projectName, status: '确认业务风险', note: '隐藏项目备注',
+        firstReviewedAt: '2026-07-17T09:00:00.000Z', lastReviewedAt: '2026-07-17T09:00:00.000Z',
+        fingerprint: 'hidden', dataUpdated: false, history: []
+      }
+    };
+
+    const report = createReviewReport(projected, mixedReviews, reportDate, ['部门：华东部']);
+
+    expect(report).toContain('远景综合管廊项目');
+    expect(report).not.toContain(hidden.projectName);
+    expect(report).not.toContain('仅属于隐藏项目的证据');
+    expect(report).not.toContain('隐藏项目备注');
+    expect(report).toContain('## 经营结构分析');
+    expect(report).not.toContain('重点风险项目');
+    expect(report).not.toContain('低概率重点项目');
+  });
+
+  it('does not count information-only findings as pending review work', () => {
+    const infoOnly = buildAnalysis([row], [findings[1]], reportDate);
+    const report = createReviewReport(infoOnly, reviews, reportDate);
+
+    expect(report).toContain('### 待复核项目\n\n本期无项目。');
+    expect(report).toContain('### 已确认数据错误项目\n\n本期无项目。');
+  });
+
+  it('exports every finding when one category contains more than eight items', () => {
+    const rows = Array.from({ length: 12 }, (_, index) => makeProject({
+      sourceKey: `row-${index + 1}`,
+      projectId: `P-${index + 1}`,
+      projectName: `完整导出项目${index + 1}`
+    }));
+    const manyFindings: Finding[] = rows.map((project, index) => ({
+      ruleId: `complete-${index + 1}`,
+      rowKey: project.sourceKey,
+      projectId: project.projectId,
+      projectName: project.projectName,
+      customerName: project.customerName,
+      department: project.department,
+      salesManager: project.salesManager,
+      amountWan: project.amount,
+      category: '数据质量待复核',
+      label: `完整性问题${index + 1}`,
+      reason: `第${index + 1}条证据`,
+      level: 'review'
+    }));
+
+    const report = createReviewReport(buildAnalysis(rows, manyFindings, reportDate), {}, reportDate);
+
+    expect(report.match(/完整性问题\d+/g)).toHaveLength(24);
+    expect(report).toContain('完整导出项目12');
+    expect(report).toContain('第12条证据');
+  });
+
+  it('keeps untrusted report fields inline and escapes markdown and html structures', () => {
+    const unsafe = makeProject({
+      sourceKey: 'unsafe',
+      projectId: 'P-UNSAFE',
+      projectName: '正常名\n## 伪造章节\n- 伪造列表 **加粗** | <script>alert(1)</script>'
+    });
+    const unsafeFinding: Finding = {
+      ruleId: 'unsafe', rowKey: unsafe.sourceKey, projectId: unsafe.projectId, projectName: unsafe.projectName,
+      customerName: '客户\n## 客户章节', department: '部门\n- 列表', salesManager: '销售 **甲**', amountWan: 100,
+      category: '数据质量待复核', label: '异常 **标签** |',
+      reason: '证据\n## 假章节\n- 假列表 <script>bad()</script>', level: 'review'
+    };
+    const unsafeReviews: ReviewRecordMap = {
+      unsafe: {
+        projectId: unsafe.projectId, projectName: unsafe.projectName, status: '确认数据错误',
+        note: '备注\n## 备注章节\n- 备注列表 **伪造** | <script>bad()</script>',
+        firstReviewedAt: '2026-07-17T09:00:00.000Z', lastReviewedAt: '2026-07-17T09:00:00.000Z',
+        fingerprint: 'unsafe', dataUpdated: false, history: []
+      }
+    };
+    const report = createReviewReport(
+      buildAnalysis([unsafe], [unsafeFinding], reportDate),
+      unsafeReviews,
+      reportDate,
+      ['部门：华东\n## 范围章节 | <script>scope()</script>']
+    );
+
+    expect(report.match(/^## /gm)).toHaveLength(8);
+    expect(report).not.toContain('\n## 伪造章节');
+    expect(report).not.toContain('\n## 假章节');
+    expect(report).not.toContain('**加粗**');
+    expect(report).not.toContain('**伪造**');
+    expect(report).not.toContain('<script>');
+    expect(report).not.toContain(' | ');
+    expect(report).toContain('&lt;script&gt;alert(1)&lt;/script&gt;');
+    expect(report).toContain('&#42;&#42;加粗&#42;&#42;');
+    expect(report).toContain('&#124;');
+  });
+
+  it('formats dates from local calendar getters instead of UTC conversion', () => {
+    const localDate = new Date('2026-07-21T00:30:00+08:00');
+    const expected = [
+      localDate.getFullYear(),
+      String(localDate.getMonth() + 1).padStart(2, '0'),
+      String(localDate.getDate()).padStart(2, '0')
+    ].join('-');
+
+    expect(formatLocalDate(localDate)).toBe(expected);
   });
 });

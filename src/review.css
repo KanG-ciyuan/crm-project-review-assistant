@@ -4,6 +4,80 @@
   gap: 8px;
 }
 
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.analysis-results {
+  min-width: 0;
+}
+
+.result-areas {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 18px;
+}
+
+.result-section {
+  background: #fff;
+  border: 1px solid #dce6e6;
+  min-width: 0;
+}
+
+.result-count {
+  color: #52676d;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.finding-stack {
+  display: grid;
+  gap: 7px;
+  max-width: 360px;
+  white-space: normal;
+}
+
+.finding-stack > div {
+  align-items: flex-start;
+  display: flex;
+  gap: 7px;
+  line-height: 1.45;
+}
+
+.finding-stack .tag {
+  flex: 0 0 auto;
+}
+
+.finding-review {
+  color: #946203;
+  background: #fff1d5;
+}
+
+.finding-action {
+  color: #a53d3b;
+  background: #fde8e7;
+}
+
+.finding-info,
+.information-state {
+  color: #376669;
+  background: #e8f4f2;
+}
+
+.information-state {
+  display: inline-block;
+  padding: 4px 7px;
+  font-size: 11px;
+}
+
 .review-control {
   display: grid;
   gap: 6px;
@@ -37,6 +111,72 @@
   color: #b9ced0;
   font-size: 12px;
   line-height: 1.5;
+}
+
+.source-namespace {
+  color: #eaf4f3;
+  display: grid;
+  font-size: 11px;
+  gap: 6px;
+  margin-top: 14px;
+}
+
+.source-namespace input {
+  background: #fff;
+  border: 1px solid rgba(255, 255, 255, .32);
+  color: #17252b;
+  padding: 9px;
+  width: 100%;
+}
+
+.source-namespace input[aria-invalid="true"] {
+  border-color: #ff9e98;
+}
+
+.source-namespace small {
+  color: #b6d1cf;
+  line-height: 1.5;
+}
+
+.value-mapping-summary {
+  border-block: 1px solid #e1e9e9;
+  margin-bottom: 18px;
+  padding: 16px 0;
+}
+
+.value-mapping-summary h3 {
+  font-size: 14px;
+  margin: 0 0 10px;
+}
+
+.value-mapping-summary dl,
+.value-mapping-summary ul {
+  margin: 0;
+  padding: 0;
+}
+
+.value-mapping-summary dl > div {
+  display: grid;
+  font-size: 12px;
+  gap: 12px;
+  grid-template-columns: 90px minmax(0, 1fr);
+  padding: 6px 0;
+}
+
+.value-mapping-summary dt {
+  color: #718188;
+}
+
+.value-mapping-summary dd {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.value-mapping-summary li {
+  list-style: none;
+  margin-bottom: 4px;
+  white-space: normal;
 }
 
 .threshold input:disabled {
