@@ -4,13 +4,34 @@ import { groupIssuesByProject, type ProjectIssueGroup } from './issues';
 import type { Finding } from './rules';
 import type { ReviewRecordMap, ReviewStatus } from './review';
 
-const formatDate = (date: Date) => date.toISOString().slice(0, 10);
+export function formatLocalDate(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
 
-const safeScopeItem = (value: string) => value
+const MARKDOWN_INLINE_ENTITIES: Record<string, string> = {
+  '\\': '&#92;',
+  '`': '&#96;',
+  '*': '&#42;',
+  '_': '&#95;',
+  '[': '&#91;',
+  ']': '&#93;',
+  '#': '&#35;',
+  '|': '&#124;'
+};
+
+export const safeMarkdownInline = (value: string) => value
   .replace(/[\r\n\t]+/g, ' ')
-  .replace(/\|/g, '/')
   .replace(/\s+/g, ' ')
-  .trim();
+  .trim()
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/[\\`*_\[\]#|]/g, (character) => MARKDOWN_INLINE_ENTITIES[character])
+  .replace(/(^|\s)-(?=\s)/g, '$1&#45;')
+  .replace(/(^|\s)\+(?=\s)/g, '$1&#43;');
 
 const findingState = (finding: Finding) => finding.level === 'info'
   ? '经营观察'
@@ -18,11 +39,11 @@ const findingState = (finding: Finding) => finding.level === 'info'
 
 const renderFindings = (findings: Finding[]) => findings.length === 0
   ? '本期未发现此类项目。'
-  : findings.slice(0, 8).map((finding) => `- **${finding.projectId || '未填写项目编号'} ${finding.projectName || '未填写项目名称'}**：${finding.label}。${finding.reason}（${findingState(finding)}）`).join('\n');
+  : findings.map((finding) => `- **${safeMarkdownInline(finding.projectId || '未填写项目编号')} ${safeMarkdownInline(finding.projectName || '未填写项目名称')}**：${safeMarkdownInline(finding.label)}。${safeMarkdownInline(finding.reason)}（${findingState(finding)}）`).join('\n');
 
 const reviewLine = (group: ProjectIssueGroup, note: string) => {
-  const labels = group.findings.map((finding) => finding.label).join('、');
-  return `- **${group.projectId || '未填写项目编号'} ${group.projectName || '未填写项目名称'}**：${labels}${note ? `。${note}` : ''}`;
+  const labels = group.findings.map((finding) => safeMarkdownInline(finding.label)).join('、');
+  return `- **${safeMarkdownInline(group.projectId || '未填写项目编号')} ${safeMarkdownInline(group.projectName || '未填写项目名称')}**：${labels}${note ? `。${safeMarkdownInline(note)}` : ''}`;
 };
 
 function renderReviewProgress(analysis: AnalysisResult, reviews: ReviewRecordMap) {
@@ -50,14 +71,14 @@ export function createReviewReport(
   filterScope: string[] = []
 ): string {
   const { overview } = analysis;
-  const scope = filterScope.map(safeScopeItem).filter(Boolean);
+  const scope = filterScope.map(safeMarkdownInline).filter(Boolean);
   const resultSections = FINDING_CATEGORIES.flatMap((category) => [
     `## ${category}`,
     renderFindings(analysis.results[category])
   ]);
   return [
     '# 储备项目经营复盘',
-    `生成日期：${formatDate(today)}`,
+    `生成日期：${formatLocalDate(today)}`,
     ...(scope.length > 0 ? [`筛选范围：${scope.join('；')}`] : []),
     '> 本报告基于导入数据和规则标签生成，金额、日期、项目状态及业务结论须由业务人员确认。',
     '## 经营概览',

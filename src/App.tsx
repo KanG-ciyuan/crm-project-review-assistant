@@ -7,7 +7,7 @@ import { AnalysisResults } from './components/AnalysisResults';
 import { ImportWizard, type ImportReadyPayload } from './components/ImportWizard';
 import { buildAnalysis, evaluateRulePack, projectAnalysis, type AnalysisResult, type CanonicalFieldKey } from './domain/analyze';
 import { describeFilters, EMPTY_FILTERS, filterProjectKeys, type FilterState } from './domain/filters';
-import { createReviewReport } from './domain/report';
+import { createReviewReport, formatLocalDate } from './domain/report';
 import { loadReviewRecords, reconcileReviewRecords, saveReviewRecords, updateReviewRecord, type ReviewRecordMap, type ReviewStatus } from './domain/review';
 import { inspectSheet, inspectWorkbook, type WorkbookInspection } from './lib/workbook';
 
@@ -115,9 +115,14 @@ export default function App() {
     const link = document.createElement('a');
     const objectUrl = URL.createObjectURL(blob);
     link.href = objectUrl;
-    link.download = `储备项目经营复盘-${new Date().toISOString().slice(0, 10)}-${suffix}.md`;
-    link.click();
-    URL.revokeObjectURL(objectUrl);
+    link.download = `储备项目经营复盘-${formatLocalDate(new Date())}-${suffix}.md`;
+    document.body.append(link);
+    try {
+      link.click();
+    } finally {
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
+    }
   }
 
   async function copyFeedbackEmail() {

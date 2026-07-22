@@ -1,4 +1,4 @@
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, expect, it, vi } from 'vitest';
 import * as XLSX from 'xlsx';
@@ -179,7 +179,7 @@ it('projects one global filter across metrics and result areas without changing 
   ]), '商机表');
   vi.spyOn(workbookApi, 'inspectWorkbook').mockResolvedValue({ workbook, sheetNames: ['商机表'] });
   vi.useFakeTimers({ shouldAdvanceTime: true });
-  vi.setSystemTime(new Date('2026-07-21T09:00:00+08:00'));
+  vi.setSystemTime(new Date('2026-07-21T00:30:00+08:00'));
 
   render(<App />);
   await user.upload(screen.getByLabelText('选择 .xlsx 文件'), new File(['content'], '商机.xlsx'));
@@ -210,6 +210,8 @@ it('projects one global filter across metrics and result areas without changing 
   const createdUrls: string[] = [];
   const exportedBlobs: Blob[] = [];
   const downloadedNames: string[] = [];
+  const attachedDuringClick: boolean[] = [];
+  const downloadedAnchors: HTMLAnchorElement[] = [];
   vi.spyOn(URL, 'createObjectURL').mockImplementation((blob) => {
     if (!(blob instanceof Blob)) throw new TypeError('报告导出必须使用 Blob');
     exportedBlobs.push(blob);
@@ -219,16 +221,22 @@ it('projects one global filter across metrics and result areas without changing 
   });
   const revokeObjectURL = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
   vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
+    attachedDuringClick.push(document.body.contains(this));
+    downloadedAnchors.push(this);
     downloadedNames.push(this.download);
   });
 
-  await user.click(screen.getByRole('button', { name: '导出当前筛选结果' }));
-  await user.click(screen.getByRole('button', { name: '导出全部结果' }));
+  fireEvent.click(screen.getByRole('button', { name: '导出当前筛选结果' }));
+  fireEvent.click(screen.getByRole('button', { name: '导出全部结果' }));
 
   expect(downloadedNames).toEqual([
     '储备项目经营复盘-2026-07-21-当前筛选.md',
     '储备项目经营复盘-2026-07-21-全部.md'
   ]);
+  expect(attachedDuringClick).toEqual([true, true]);
+  expect(downloadedAnchors.every((anchor) => !anchor.isConnected)).toBe(true);
+  expect(revokeObjectURL).not.toHaveBeenCalled();
+  await vi.runAllTimersAsync();
   expect(revokeObjectURL).toHaveBeenNthCalledWith(1, createdUrls[0]);
   expect(revokeObjectURL).toHaveBeenNthCalledWith(2, createdUrls[1]);
   const readBlob = (blob: Blob) => new Promise<string>((resolve, reject) => {
