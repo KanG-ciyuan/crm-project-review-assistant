@@ -24,6 +24,28 @@ describe('field mappings', () => {
     expect(evaluateRulePack(rows, new Date('2026-07-21')).map((item) => item.label)).toContain('金额格式异常');
     expect(evaluateRulePack(rows, new Date('2026-07-21')).map((item) => item.label)).not.toContain('储备金额待补充');
   });
+
+  it('preserves non-empty unparseable dates for rule-level format review', () => {
+    const rows = applyMappings(
+      [{ 创建日期: '待确认', 最近跟进日期: '错误日期', 预计签约日期: '下个月' }],
+      [
+        { sourceHeader: '创建日期', mode: 'standard', targetField: 'createdAt' },
+        { sourceHeader: '最近跟进日期', mode: 'standard', targetField: 'lastFollowUpAt' },
+        { sourceHeader: '预计签约日期', mode: 'standard', targetField: 'expectedSignAt' }
+      ],
+      emptyValueMappings,
+      '商机表'
+    );
+    expect(rows[0]).toMatchObject({
+      createdAt: null,
+      createdAtParseError: true,
+      lastFollowUpAt: null,
+      lastFollowUpAtParseError: true,
+      expectedSignAt: null,
+      expectedSignAtParseError: true
+    });
+    expect(evaluateRulePack(rows, new Date('2026-07-21')).filter((item) => item.label === '日期格式异常')).toHaveLength(3);
+  });
   it('suggests canonical fields from local aliases without an API call', () => {
     expect(suggestMappings(['商机名称', '业务负责人', '客户', '最后联系时间']))
       .toMatchObject([

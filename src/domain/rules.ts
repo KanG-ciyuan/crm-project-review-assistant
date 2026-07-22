@@ -17,6 +17,7 @@ export type FindingLevel = 'info' | 'review' | 'action';
 
 export interface Finding {
   ruleId: string;
+  relationKey?: string;
   rowKey: string;
   projectId: string;
   projectName: string;
@@ -55,7 +56,10 @@ const LONG_TERM_DAYS = 365;
 
 export const RULE_DEFINITIONS: RuleDefinition[] = [
   { id: 'follow-up-overdue', name: '跟进超期', category: '维护超期待整改', requiredFields: ['status', 'lastFollowUpAt'], adjustable: false },
-  { id: 'signing-overdue', name: '签约日期超期未更新', category: '维护超期待整改', requiredFields: ['status', 'createdAt', 'expectedSignAt'], adjustable: false },
+  { id: 'signing-overdue', name: '签约日期超期未更新', category: '维护超期待整改', requiredFields: ['status', 'expectedSignAt'], adjustable: false },
+  { id: 'date-created-quality', name: '创建日期完整性', category: '数据质量待复核', requiredFields: ['createdAt'], adjustable: false },
+  { id: 'date-follow-up-quality', name: '最近跟进日期完整性', category: '数据质量待复核', requiredFields: ['lastFollowUpAt'], adjustable: false },
+  { id: 'date-signing-quality', name: '预计签约日期完整性', category: '数据质量待复核', requiredFields: ['expectedSignAt'], adjustable: false },
   { id: 'date-last-follow-up', name: '跟进日期逻辑异常', category: '数据质量待复核', requiredFields: ['createdAt', 'lastFollowUpAt'], adjustable: false },
   { id: 'date-expected-sign', name: '签约日期逻辑异常', category: '数据质量待复核', requiredFields: ['createdAt', 'expectedSignAt'], adjustable: false },
   { id: 'amount-required', name: '储备金额必须大于 0', category: '数据质量待复核', requiredFields: ['amount', 'unit'], adjustable: false },
@@ -137,6 +141,28 @@ function finding(
   };
 }
 
+function evaluateDateQuality(row: ProjectRow): Finding[] {
+  const fields: Array<{
+    ruleId: string;
+    label: string;
+    value: string | null;
+    parseError: boolean;
+  }> = [
+    { ruleId: 'date-created-quality', label: '创建日期', value: row.createdAt, parseError: row.createdAtParseError },
+    { ruleId: 'date-follow-up-quality', label: '最近跟进日期', value: row.lastFollowUpAt, parseError: row.lastFollowUpAtParseError },
+    { ruleId: 'date-signing-quality', label: '预计签约日期', value: row.expectedSignAt, parseError: row.expectedSignAtParseError }
+  ];
+  return fields.flatMap(({ ruleId, label, value, parseError }) => {
+    if (parseError || (value !== null && !parseStrictDate(value))) {
+      return [finding(row, ruleId, '数据质量待复核', '日期格式异常', `${label}无法识别为有效日期`, 'review')];
+    }
+    if (value === null) {
+      return [finding(row, ruleId, '数据质量待复核', '字段待补充', `缺少${label}`, 'review')];
+    }
+    return [];
+  });
+}
+
 function evaluateDates(row: ProjectRow, today: Date): Finding[] {
   const results: Finding[] = [];
   const createdAt = parseStrictDate(row.createdAt);
@@ -152,7 +178,8 @@ function evaluateDates(row: ProjectRow, today: Date): Finding[] {
   const impossibleSigningDate = Boolean(createdAt && expectedSignAt && expectedSignAt < createdAt);
   if (impossibleSigningDate) {
     results.push(finding(row, 'date-expected-sign', '数据质量待复核', '签约日期逻辑异常', '预计签约日期早于项目创建日期', 'review'));
-  } else if (isOpen && expectedSignAt && expectedSignAt < todayStart) {
+  }
+  if (isOpen && expectedSignAt && expectedSignAt < todayStart) {
     results.push(finding(row, 'signing-overdue', '维护超期待整改', '签约日期超期未更新', '预计签约日期已过，应在 24 小时内回到 CRM 更新日期或项目状态', 'action'));
   }
 
@@ -287,11 +314,12 @@ function evaluateDuplicates(rows: ProjectRow[]): Finding[] {
       const rightName = normalizeProjectName(right.projectName);
       if (distinctProjectMarkers(left.projectName, right.projectName)) continue;
       if (!conservativeSimilarity(leftName, rightName)) continue;
-      results.push(finding(left, 'similar-name', '疑似重复与撞单', '名称相似待核验', `与“${right.projectName}”名称相似，仅作人工核验提示`, 'info'));
-      results.push(finding(right, 'similar-name', '疑似重复与撞单', '名称相似待核验', `与“${left.projectName}”名称相似，仅作人工核验提示`, 'info'));
+      const relationKey = [projectKey(left), projectKey(right)].sort().join('\u0000');
+      results.push({ ...finding(left, 'similar-name', '疑似重复与撞单', '名称相似待核验', `与“${right.projectName}”名称相似，仅作人工核验提示`, 'info'), relationKey });
+      results.push({ ...finding(right, 'similar-name', '疑似重复与撞单', '名称相似待核验', `与“${left.projectName}”名称相似，仅作人工核验提示`, 'info'), relationKey });
     }
   }
-  return [...new Map(results.map((item) => [`${item.rowKey}\u0000${item.ruleId}`, item])).values()];
+  return [...new Map(results.map((item) => [`${item.rowKey}\u0000${item.ruleId}\u0000${item.relationKey ?? ''}`, item])).values()];
 }
 
 function evaluateProbability(row: ProjectRow): Finding[] {
@@ -307,6 +335,7 @@ export interface RuleEvaluationOptions {
 export function evaluateRulePack(rows: ProjectRow[], today: Date, options: RuleEvaluationOptions = {}): Finding[] {
   const rowFindings = rows.flatMap((row) => [
     ...evaluateProbability(row),
+    ...evaluateDateQuality(row),
     ...evaluateDates(row, today),
     ...evaluateAmount(row)
   ]);
@@ -318,9 +347,17 @@ export function evaluateRulePack(rows: ProjectRow[], today: Date, options: RuleE
   const availableRuleIds = options.mappedFields
     ? new Set(getRuleCapabilities(options.mappedFields).filter((item) => item.available).map((item) => item.ruleId))
     : null;
-  return findings.filter((item) => {
+  const filtered = findings.filter((item) => {
     const capabilityRuleId = item.ruleId.startsWith('amount-tier') ? 'amount-tier' : item.ruleId;
+    const definition = RULE_DEFINITIONS.find((rule) => rule.id === capabilityRuleId);
+    const disabledByChoice = Boolean(definition?.adjustable
+      && options.enabledRuleIds
+      && !options.enabledRuleIds.has(capabilityRuleId));
     return (!availableRuleIds || availableRuleIds.has(capabilityRuleId))
-      && (!options.enabledRuleIds || options.enabledRuleIds.has(capabilityRuleId));
+      && !disabledByChoice;
   });
+  const impossibleSigningRows = new Set(filtered
+    .filter((item) => item.ruleId === 'date-expected-sign')
+    .map((item) => item.rowKey));
+  return filtered.filter((item) => item.ruleId !== 'signing-overdue' || !impossibleSigningRows.has(item.rowKey));
 }

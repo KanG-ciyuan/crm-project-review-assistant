@@ -184,11 +184,12 @@ describe('confirmed To B rule pack', () => {
     expect(finding?.label ?? null).toBe(label);
   });
 
-  it('ignores invalid dates instead of triggering date rules', () => {
+  it('reports invalid dates without triggering time-based rules', () => {
     const findings = evaluateRulePack([
       makeProject({ createdAt: 'not-a-date', lastFollowUpAt: 'also-invalid', expectedSignAt: 'bad' })
     ], today);
-    expect(findings.some((item) => item.ruleId.startsWith('date-') || item.ruleId === 'follow-up-overdue' || item.ruleId === 'signing-overdue')).toBe(false);
+    expect(findings.filter((item) => item.label === '日期格式异常')).toHaveLength(3);
+    expect(findings.some((item) => item.ruleId === 'follow-up-overdue' || item.ruleId === 'signing-overdue')).toBe(false);
   });
 
   it('reports unavailable rules and their missing mapped fields', () => {
@@ -206,6 +207,37 @@ describe('confirmed To B rule pack', () => {
       { mappedFields: new Set(['projectName', 'status']) }
     );
     expect(findings).toEqual([]);
+  });
+
+  it('reports blank mapped dates but skips an entirely unmapped date column', () => {
+    const row = makeProject({ createdAt: null, lastFollowUpAt: null, expectedSignAt: null });
+    const mappedFindings = evaluateRulePack([row], today, {
+      mappedFields: new Set(['createdAt', 'lastFollowUpAt', 'expectedSignAt'])
+    });
+    expect(mappedFindings.filter((item) => item.label === '字段待补充').map((item) => item.reason)).toEqual(expect.arrayContaining([
+      '缺少创建日期', '缺少最近跟进日期', '缺少预计签约日期'
+    ]));
+
+    const unmappedFindings = evaluateRulePack([row], today, { mappedFields: new Set(['projectName']) });
+    expect(unmappedFindings.some((item) => item.label === '字段待补充' || item.label === '日期格式异常')).toBe(false);
+  });
+
+  it('runs signing overdue when only status and expected signing date are mapped', () => {
+    const findings = evaluateRulePack([
+      makeProject({ createdAt: '2026-08-01', expectedSignAt: '2026-07-01' })
+    ], today, { mappedFields: new Set(['status', 'expectedSignAt']) });
+    expect(findings.map((item) => item.label)).toContain('签约日期超期未更新');
+    expect(findings.map((item) => item.label)).not.toContain('签约日期逻辑异常');
+  });
+
+  it('keeps mandatory rules enabled when enabledRuleIds is empty', () => {
+    const findings = evaluateRulePack([
+      makeProject({ amount: null })
+    ], today, {
+      mappedFields: new Set(['amount', 'unit']),
+      enabledRuleIds: new Set()
+    });
+    expect(findings.map((item) => item.label)).toContain('储备金额待补充');
   });
 
   it('treats a confirmed fixed amount unit as an available capability', () => {
@@ -226,5 +258,21 @@ describe('confirmed To B rule pack', () => {
       makeProject({ sourceKey: 'b', projectId: 'SAME', customerName: '客户乙', projectName: '项目乙' })
     ], today).filter((item) => item.label === '重复记录待核实');
     expect(findings.every((item) => item.category === '数据质量待复核')).toBe(true);
+  });
+
+  it('keeps every unordered similar-name relationship visible without duplicates', () => {
+    const rows = [
+      makeProject({ sourceKey: 'similar-1', projectId: 'SIM-1', projectName: '华城医院数字化改造项目' }),
+      makeProject({ sourceKey: 'similar-2', projectId: 'SIM-2', projectName: '华城医院数字化改造工程' }),
+      makeProject({ sourceKey: 'similar-3', projectId: 'SIM-3', projectName: '华城医院数字化改造方案' })
+    ];
+    const findings = evaluateRulePack(rows, today).filter((item) => item.ruleId === 'similar-name');
+
+    expect(new Set(findings.map((item) => item.relationKey)).size).toBe(3);
+    expect(findings).toHaveLength(6);
+    expect(findings.filter((item) => item.rowKey === 'similar-1').map((item) => item.reason)).toEqual(expect.arrayContaining([
+      expect.stringContaining('华城医院数字化改造工程'),
+      expect.stringContaining('华城医院数字化改造方案')
+    ]));
   });
 });

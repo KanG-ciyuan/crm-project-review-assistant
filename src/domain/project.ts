@@ -21,8 +21,11 @@ export interface ProjectRow {
   amountParseError: boolean;
   unit: '元' | '万元' | '亿元' | string;
   createdAt: string | null;
+  createdAtParseError: boolean;
   lastFollowUpAt: string | null;
+  lastFollowUpAtParseError: boolean;
   expectedSignAt: string | null;
+  expectedSignAtParseError: boolean;
   probabilityBand: ProbabilityBand;
   industry: string;
   region: string;

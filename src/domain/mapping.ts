@@ -230,8 +230,11 @@ const emptyProject = (): ProjectRow => ({
   amountParseError: false,
   unit: '',
   createdAt: null,
+  createdAtParseError: false,
   lastFollowUpAt: null,
+  lastFollowUpAtParseError: false,
   expectedSignAt: null,
+  expectedSignAtParseError: false,
   probabilityBand: '未知',
   industry: '',
   region: '',
@@ -256,9 +259,21 @@ function assignStandardField(
     case 'status': row.status = toStatus(value, values); break;
     case 'probabilityBand': row.probabilityBand = toProbability(value, values); break;
     case 'unit': row.unit = isPresent(value) ? toUnit(values.amountUnit) : ''; break;
-    case 'createdAt':
-    case 'lastFollowUpAt':
-    case 'expectedSignAt':
+    case 'createdAt': {
+      row.createdAt = toDateString(value);
+      row.createdAtParseError = isPresent(value) && row.createdAt === null;
+      break;
+    }
+    case 'lastFollowUpAt': {
+      row.lastFollowUpAt = toDateString(value);
+      row.lastFollowUpAtParseError = isPresent(value) && row.lastFollowUpAt === null;
+      break;
+    }
+    case 'expectedSignAt': {
+      row.expectedSignAt = toDateString(value);
+      row.expectedSignAtParseError = isPresent(value) && row.expectedSignAt === null;
+      break;
+    }
     case 'latestUpdatedAt': row[field] = toDateString(value); break;
     default: row[field] = toText(value); break;
   }

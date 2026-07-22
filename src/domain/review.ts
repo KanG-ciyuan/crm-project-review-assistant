@@ -44,6 +44,9 @@ export function createProjectFingerprint(row: ProjectRow) {
     normalized(row.lastFollowUpAt),
     normalized(row.expectedSignAt),
     normalized(row.createdAt),
+    normalized(row.createdAtParseError),
+    normalized(row.lastFollowUpAtParseError),
+    normalized(row.expectedSignAtParseError),
     normalized(row.latestUpdatedAt)
   ]);
 }
