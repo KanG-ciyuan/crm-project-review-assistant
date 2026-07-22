@@ -1,9 +1,12 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Copy, Download, FileSpreadsheet, GitFork, Mail, ShieldCheck, Upload } from 'lucide-react';
 import './review.css';
+import './filters.css';
+import { AnalysisFilters } from './components/AnalysisFilters';
 import { AnalysisResults } from './components/AnalysisResults';
 import { ImportWizard, type ImportReadyPayload } from './components/ImportWizard';
-import { buildAnalysis, evaluateRulePack, type AnalysisResult, type CanonicalFieldKey } from './domain/analyze';
+import { buildAnalysis, evaluateRulePack, projectAnalysis, type AnalysisResult, type CanonicalFieldKey } from './domain/analyze';
+import { EMPTY_FILTERS, filterProjectKeys, type FilterState } from './domain/filters';
 import { createReviewReport } from './domain/report';
 import { loadReviewRecords, reconcileReviewRecords, saveReviewRecords, updateReviewRecord, type ReviewRecordMap, type ReviewStatus } from './domain/review';
 import { inspectSheet, inspectWorkbook, type WorkbookInspection } from './lib/workbook';
@@ -15,18 +18,32 @@ export default function App() {
   const [importRevision, setImportRevision] = useState(0);
   const [importReady, setImportReady] = useState<ImportReadyPayload | null>(null);
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
+  const [filters, setFilters] = useState<FilterState>(EMPTY_FILTERS);
   const [report, setReport] = useState('');
   const [error, setError] = useState('');
   const [reviewRecords, setReviewRecords] = useState<ReviewRecordMap>(() => loadReviewRecords(window.localStorage));
   const [feedbackCopied, setFeedbackCopied] = useState(false);
 
   const sheetInspection = useMemo(() => inspection && sheetName ? inspectSheet(inspection.workbook, sheetName) : null, [inspection, sheetName]);
+  const selectedKeys = useMemo(
+    () => analysis ? filterProjectKeys(analysis, reviewRecords, filters) : new Set<string>(),
+    [analysis, reviewRecords, filters]
+  );
+  const visibleAnalysis = useMemo(
+    () => analysis ? projectAnalysis(analysis, selectedKeys) : null,
+    [analysis, selectedKeys]
+  );
+
+  useEffect(() => {
+    if (visibleAnalysis) setReport(createReviewReport(visibleAnalysis, reviewRecords, new Date()));
+  }, [visibleAnalysis, reviewRecords]);
 
   async function onFileChange(file: File | null) {
     if (!file) return;
     try {
       setError('');
       setAnalysis(null);
+      setFilters(EMPTY_FILTERS);
       setImportReady(null);
       setReport('');
       const next = await inspectWorkbook(file);
@@ -36,6 +53,7 @@ export default function App() {
       setFileName(file.name);
     } catch (caught) {
       setInspection(null);
+      setFilters(EMPTY_FILTERS);
       setImportReady(null);
       setSheetName('');
       setFileName('');
@@ -56,6 +74,7 @@ export default function App() {
     const nextReviews = reconcileReviewRecords(result.rows, reviewKeys, reviewRecords, now);
     saveReviewRecords(nextReviews, window.localStorage);
     setAnalysis(result);
+    setFilters(EMPTY_FILTERS);
     setImportReady(payload);
     setReviewRecords(nextReviews);
     setReport(createReviewReport(result, nextReviews, now));
@@ -64,6 +83,7 @@ export default function App() {
   function clearImportedAnalysis() {
     setImportReady(null);
     setAnalysis(null);
+    setFilters(EMPTY_FILTERS);
     setReport('');
   }
 
@@ -78,7 +98,6 @@ export default function App() {
     }, now);
     saveReviewRecords(next, window.localStorage);
     setReviewRecords(next);
-    setReport(createReviewReport(analysis, next, now));
   }
 
   function downloadReport() {
@@ -106,7 +125,7 @@ export default function App() {
         {fileName && <div className="file-state"><FileSpreadsheet size={17} /><div><b>{fileName}</b><span>{importReady?.rows.length ?? '待确认'} 条项目记录</span></div></div>}
         {error && <p className="error">{error}</p>}
       </div>
-      {inspection && <div className="side-section"><p className="side-label">工作表</p><select aria-label="工作表" value={sheetName} onChange={(event) => { setSheetName(event.target.value); setImportReady(null); setAnalysis(null); setReport(''); }}>{inspection.sheetNames.map((name) => <option key={name}>{name}</option>)}</select>
+      {inspection && <div className="side-section"><p className="side-label">工作表</p><select aria-label="工作表" value={sheetName} onChange={(event) => { setSheetName(event.target.value); setImportReady(null); setAnalysis(null); setFilters(EMPTY_FILTERS); setReport(''); }}>{inspection.sheetNames.map((name) => <option key={name}>{name}</option>)}</select>
         <p className="side-label threshold-title">规则阈值</p>
         <Threshold label="跟进维护周期" value={30} suffix="天" />
         <Threshold label="重点项目金额" value={1000} suffix="万元" />
@@ -118,8 +137,9 @@ export default function App() {
       <header><div><h1>储备项目运营复盘助手</h1><p>以固定规则发现数据质量问题和经营风险，最终结论由业务人员确认。</p></div></header>
       {!inspection && <section className="empty import-guide"><FileSpreadsheet size={36} /><h2>上传 CRM 储备项目表</h2><p>支持未加密的 .xlsx 文件，可在导入向导中确认表头、字段关系和业务口径。</p><a className="sample-download" href="/CRM历史项目表-脱敏适配样表.xlsx" download><Download size={15} /> 下载脱敏示例表</a></section>}
       {sheetInspection && <ImportWizard key={`${importRevision}:${fileName}:${sheetName}`} inspection={sheetInspection} onReady={startAnalysis} onConfigurationChange={clearImportedAnalysis} />}
-      {analysis && <>
-        <AnalysisResults analysis={analysis} reviews={reviewRecords} onChangeReview={changeReview} />
+      {analysis && visibleAnalysis && <>
+        <AnalysisFilters analysis={analysis} filters={filters} reviews={reviewRecords} onChange={setFilters} />
+        <AnalysisResults analysis={visibleAnalysis} reviews={reviewRecords} onChangeReview={changeReview} />
         <section className="report-card"><div className="table-heading"><div><h2>经营复盘草稿</h2><p>本地规则自动生成，可人工编辑后下载。</p></div><button className="secondary" onClick={downloadReport} disabled={!report}><Download size={15} /> 下载 Markdown</button></div><textarea value={report} onChange={(event) => setReport(event.target.value)} aria-label="经营复盘草稿" /></section>
       </>}
       <footer className="product-footer">
