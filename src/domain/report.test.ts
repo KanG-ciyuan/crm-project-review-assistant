@@ -8,7 +8,7 @@ import type { ReviewRecordMap } from './review';
 const row = makeProject({ sourceKey: 'row-24', projectId: 'P-2026-024', projectName: '远景综合管廊项目' });
 const reportDate = new Date(2026, 6, 16, 12);
 const findings: Finding[] = [
-  { ruleId: 'amount', rowKey: 'row-24', projectId: row.projectId, projectName: row.projectName, customerName: row.customerName, department: row.department, salesManager: row.salesManager, amountWan: 50000, category: '数据质量待复核', label: '金额需复核', reason: '超过本次复核上限', level: 'review' },
+  { ruleId: 'amount-placeholder', rowKey: 'row-24', projectId: row.projectId, projectName: row.projectName, customerName: row.customerName, department: row.department, salesManager: row.salesManager, amountWan: 50000, category: '数据质量待复核', label: '金额需复核', reason: '超过本次复核上限', level: 'review' },
   { ruleId: 'reserve', rowKey: 'row-24', projectId: row.projectId, projectName: row.projectName, customerName: row.customerName, department: row.department, salesManager: row.salesManager, amountWan: 50000, category: '经营结构分析', label: '长周期项目', reason: '仅用于经营观察', level: 'info' }
 ];
 const analysis = buildAnalysis([row], findings, reportDate);
@@ -127,6 +127,34 @@ describe('createReviewReport', () => {
     expect(peopleSection.match(/^- /gm)).toHaveLength(5);
     expect(peopleSection).toMatch(/部门：华东部（2 个问题项目）[\s\S]*负责人：销售乙（2 个问题项目）/);
     expect(peopleSection).not.toContain('万元');
+  });
+
+  it('uses workbench finding kinds instead of legacy levels for review and owner counts', () => {
+    const observationRow = makeProject({ sourceKey: 'observation', department: '观察部门', salesManager: '观察负责人' });
+    const manualRow = makeProject({ sourceKey: 'manual', department: '人工部门', salesManager: '人工负责人' });
+    const kindFindings: Finding[] = [
+      {
+        ...findings[0], ruleId: 'amount-tier-extreme', rowKey: observationRow.sourceKey,
+        projectId: observationRow.projectId, projectName: observationRow.projectName,
+        department: observationRow.department, salesManager: observationRow.salesManager,
+        label: '极端金额待核实', category: '重点项目复盘', level: 'review'
+      },
+      {
+        ...findings[0], ruleId: 'similar-name', rowKey: manualRow.sourceKey,
+        projectId: manualRow.projectId, projectName: manualRow.projectName,
+        department: manualRow.department, salesManager: manualRow.salesManager,
+        label: '名称相似待核验', category: '疑似重复与撞单', level: 'info'
+      }
+    ];
+    const report = createReviewReport(buildAnalysis([observationRow, manualRow], kindFindings, reportDate), {}, reportDate);
+    const peopleSection = report.split('## 三、重点部门与负责人')[1].split('## 四、规则分布摘要')[0];
+
+    expect(report).toContain('需要复核的项目共 1 个');
+    expect(report).toContain('待复核 1 个');
+    expect(peopleSection).toContain('部门：人工部门（1 个问题项目）');
+    expect(peopleSection).toContain('负责人：人工负责人（1 个问题项目）');
+    expect(peopleSection).not.toContain('观察部门');
+    expect(peopleSection).not.toContain('观察负责人');
   });
 
   it('keeps untrusted report fields inline and escapes markdown and html structures', () => {

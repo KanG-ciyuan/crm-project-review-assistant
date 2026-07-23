@@ -1,6 +1,7 @@
 import type { AnalysisResult } from './analysis';
 import type { FindingCategory } from './rules';
 import type { ReviewRecordMap, ReviewStatus } from './review';
+import { findingKind } from './workbench';
 
 export function formatLocalDate(date: Date): string {
   const year = date.getFullYear();
@@ -35,7 +36,7 @@ const categoryLabels: Record<FindingCategory, string> = {
 const formatAmount = (value: number) => value.toLocaleString('zh-CN', { maximumFractionDigits: 2 });
 
 function reviewCounts(analysis: AnalysisResult, reviews: ReviewRecordMap): Record<ReviewStatus, number> {
-  const keys = new Set(analysis.findings.filter((finding) => finding.level !== 'info').map((finding) => finding.rowKey));
+  const keys = new Set(analysis.findings.filter((finding) => findingKind(finding) === 'manual').map((finding) => finding.rowKey));
   const counts: Record<ReviewStatus, number> = { 待复核: 0, 确认数据错误: 0, 确认业务风险: 0, 已忽略: 0 };
   keys.forEach((key) => { counts[reviews[key]?.status ?? '待复核'] += 1; });
   return counts;
@@ -56,7 +57,7 @@ function issueSummary(analysis: AnalysisResult) {
 
 function renderTopBreakdown(analysis: AnalysisResult): string[] {
   const projectsByOwner = new Map<string, { type: '部门' | '负责人'; name: string; projects: Set<string> }>();
-  analysis.findings.filter((finding) => finding.level !== 'info').forEach((finding) => {
+  analysis.findings.filter((finding) => findingKind(finding) !== 'observation').forEach((finding) => {
     ([['部门', finding.department], ['负责人', finding.salesManager]] as const).forEach(([type, rawName]) => {
       const name = rawName.trim() || '未填写';
       const key = `${type}:${name}`;
