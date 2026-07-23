@@ -44,6 +44,41 @@ describe('AnalysisWorkspace', () => {
     expect(screen.getByText('筛选工具')).toBeInTheDocument();
   });
 
+  it('moves selection and focus with arrows, Home, and End, including wraparound', async () => {
+    const user = userEvent.setup();
+    render(<AnalysisWorkspace
+      analysis={analysis}
+      fullCount={2}
+      filters={EMPTY_FILTERS}
+      reviews={{}}
+      filterControls={<div />}
+      summary={createReviewSummary(analysis, {})}
+      onChangeReview={vi.fn()}
+      onDownloadMarkdown={vi.fn()}
+      onDownloadExcel={vi.fn()}
+    />);
+    const overview = screen.getByRole('tab', { name: '分析总览' });
+    const projects = screen.getByRole('tab', { name: '项目问题清单' });
+    const summary = screen.getByRole('tab', { name: '复盘摘要' });
+    overview.focus();
+
+    await user.keyboard('{ArrowRight}');
+    expect(projects).toHaveFocus();
+    expect(projects).toHaveAttribute('aria-selected', 'true');
+    await user.keyboard('{ArrowRight}');
+    expect(summary).toHaveFocus();
+    await user.keyboard('{ArrowRight}');
+    expect(overview).toHaveFocus();
+    await user.keyboard('{ArrowLeft}');
+    expect(summary).toHaveFocus();
+    await user.keyboard('{Home}');
+    expect(overview).toHaveFocus();
+    expect(overview).toHaveAttribute('aria-selected', 'true');
+    await user.keyboard('{End}');
+    expect(summary).toHaveFocus();
+    expect(summary).toHaveAttribute('aria-selected', 'true');
+  });
+
   it('shows exactly five filtered-scope metrics and the three distributions', () => {
     render(<AnalysisWorkspace
       analysis={analysis}

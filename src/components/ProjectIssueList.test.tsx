@@ -36,7 +36,7 @@ function makeRow(index: number, overrides: Partial<ProjectWorkbenchRow> = {}): P
 describe('ProjectIssueList', () => {
   it('renders one project row with all finding blocks, dates, and relationship details', () => {
     const base = makeRow(1);
-    const manual = finding('similar-name', base.rowKey, '名称相似待核验', '与另一项目名称接近');
+    const manual = { ...finding('similar-name', base.rowKey, '名称相似待核验', '与另一项目名称接近'), relationKey: 'same' };
     const observation = finding('amount-tier-large', base.rowKey, '大额项目', '金额达到重点分档');
     const row = makeRow(1, {
       findings: [base.factFindings[0], manual, observation],
@@ -73,6 +73,31 @@ describe('ProjectIssueList', () => {
     expect(screen.getByLabelText('P-3 审查状态')).toBeInTheDocument();
     expect(screen.getAllByText('无需人工判断')).toHaveLength(2);
     expect(screen.queryByLabelText('P-1 审查状态')).not.toBeInTheDocument();
+  });
+
+  it('shows only the peer from the matching relation key under each same-label finding', () => {
+    const base = makeRow(1);
+    const relationWithB = { ...finding('similar-name', base.rowKey, '名称相似待核验', '与项目 B 名称接近'), relationKey: 'relation-b' };
+    const relationWithC = { ...finding('similar-name', base.rowKey, '名称相似待核验', '与项目 C 名称接近'), relationKey: 'relation-c' };
+    const row = makeRow(1, {
+      findings: [relationWithB, relationWithC],
+      factFindings: [],
+      manualFindings: [relationWithB, relationWithC],
+      relatedProjects: [
+        { rowKey: 'row-b', projectId: 'B', projectName: '项目B', customerName: '客户B', salesManager: '销售乙', relationKey: 'relation-b', ruleId: 'similar-name', relationLabel: '名称相似待核验' },
+        { rowKey: 'row-c', projectId: 'C', projectName: '项目C', customerName: '客户C', salesManager: '销售丙', relationKey: 'relation-c', ruleId: 'similar-name', relationLabel: '名称相似待核验' }
+      ],
+      priority: 0
+    });
+
+    render(<ProjectIssueList rows={[row]} reviews={{}} onChangeReview={vi.fn()} onExportSelection={vi.fn()} />);
+
+    const findingBlocks = screen.getAllByText('名称相似待核验').map((label) => label.closest('.finding-item') as HTMLElement);
+    expect(findingBlocks).toHaveLength(2);
+    expect(within(findingBlocks[0]).getByText(/B.*项目B.*客户B.*销售乙/)).toBeInTheDocument();
+    expect(within(findingBlocks[0]).queryByText(/C.*项目C.*客户C.*销售丙/)).not.toBeInTheDocument();
+    expect(within(findingBlocks[1]).getByText(/C.*项目C.*客户C.*销售丙/)).toBeInTheDocument();
+    expect(within(findingBlocks[1]).queryByText(/B.*项目B.*客户B.*销售乙/)).not.toBeInTheDocument();
   });
 
   it('shows 50 projects per page, keeps cross-page selection, and exports the selected keys', async () => {

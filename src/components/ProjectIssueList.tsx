@@ -123,7 +123,11 @@ function ProjectRow({ row, review, selected, onToggle, onChangeReview }: {
 function FindingGroup({ label, findings, relatedProjects }: { label: string; findings: Finding[]; relatedProjects: RelatedProject[] }) {
   if (findings.length === 0) return null;
   return <section className="finding-kind"><h3>{label}</h3>{findings.map((finding, index) => {
-    const related = relatedProjects.filter((project) => project.ruleId === finding.ruleId && project.relationLabel === finding.label);
+    const related = relatedProjects.filter((project) =>
+      project.ruleId === finding.ruleId
+      && project.relationLabel === finding.label
+      && project.relationKey === finding.relationKey
+    );
     return <div className="finding-item" key={`${finding.ruleId}:${finding.relationKey ?? ''}:${index}`}>
       <span className={`tag finding-${finding.level}`}>{finding.label}</span>
       <p>{finding.reason}</p>
