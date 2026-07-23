@@ -314,8 +314,7 @@ function businessRelationKey(ruleId: string, parts: string[]) {
 }
 
 function stableProjectIdentity(row: ProjectRow) {
-  const projectId = row.projectId.trim();
-  if (projectId) return `project-id:${projectId}`;
+  if (row.projectId) return `project-id:${row.projectId}`;
   return businessRelationKey('project-fields', [
     row.customerName.trim(),
     row.projectName.trim(),
@@ -366,7 +365,7 @@ function evaluateDuplicates(rows: ProjectRow[]): Finding[] {
             [
               normalizedCustomer(left.customerName),
               normalizeProjectName(left.projectName),
-              left.salesManager.trim()
+              left.salesManager
             ]
           );
           results.push({ ...finding(left, 'duplicate-project', '疑似重复与撞单', '疑似重复立项', '同一销售在同一客户下存在规范化后同名的不同项目编码', 'review'), relationKey });

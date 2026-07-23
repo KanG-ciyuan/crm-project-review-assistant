@@ -364,6 +364,28 @@ describe('confirmed To B rule pack', () => {
     expect(new Set(findings.map((item) => item.relationKey)).size).toBe(2);
   });
 
+  it('preserves trailing spaces when separating exact seller relation groups', () => {
+    const rows = [
+      makeProject({ sourceKey: 'seller-trimmed-a', projectId: 'TRAIL-1', customerName: '客户六', projectName: '同名项目', salesManager: '销售甲' }),
+      makeProject({ sourceKey: 'seller-trimmed-b', projectId: 'TRAIL-2', customerName: '客户六', projectName: '同名项目', salesManager: '销售甲' }),
+      makeProject({ sourceKey: 'seller-trailing-a', projectId: 'TRAIL-3', customerName: '客户六', projectName: '同名项目', salesManager: '销售甲 ' }),
+      makeProject({ sourceKey: 'seller-trailing-b', projectId: 'TRAIL-4', customerName: '客户六', projectName: '同名项目', salesManager: '销售甲 ' })
+    ];
+    const relationKeys = evaluateRulePack(rows, today)
+      .filter((item) => item.ruleId === 'duplicate-project')
+      .map((item) => item.relationKey);
+    const renamedSourceRelationKeys = evaluateRulePack(rows.map((row, index) => ({
+      ...row,
+      sourceKey: `seller-reimport:row-${index + 20}`
+    })), today)
+      .filter((item) => item.ruleId === 'duplicate-project')
+      .map((item) => item.relationKey);
+
+    expect(relationKeys).toHaveLength(4);
+    expect(new Set(relationKeys).size).toBe(2);
+    expect(new Set(renamedSourceRelationKeys)).toEqual(new Set(relationKeys));
+  });
+
   it('links both ends of an exact cross-seller collision pair without merging rule types', () => {
     const rows = [
       makeProject({ sourceKey: 'collision-a', projectId: 'NEW-3', customerName: '客户四', projectName: '撞单项目', salesManager: '销售甲' }),
@@ -417,6 +439,26 @@ describe('confirmed To B rule pack', () => {
     const renamedSourceFindings = evaluateRulePack(rows.map((row, index) => ({
       ...row,
       sourceKey: `replacement-import:row-${index + 500}`
+    })), today)
+      .filter((item) => item.ruleId === 'similar-name');
+
+    expect(similarFindings).toHaveLength(4);
+    expect(new Set(similarFindings.map((item) => item.relationKey)).size).toBe(2);
+    expect(new Set(renamedSourceFindings.map((item) => item.relationKey)))
+      .toEqual(new Set(similarFindings.map((item) => item.relationKey)));
+  });
+
+  it('preserves project-code edge spaces in stable similar-name record identities', () => {
+    const rows = [
+      makeProject({ sourceKey: 'plain-id', projectId: 'SIM-EDGE', projectName: '华城医院数字化改造项目', salesManager: '销售甲' }),
+      makeProject({ sourceKey: 'spaced-id', projectId: ' SIM-EDGE ', projectName: '华城医院数字化改造项目', salesManager: '销售乙' }),
+      makeProject({ sourceKey: 'edge-third', projectId: 'SIM-OTHER', projectName: '华城医院数字化改造工程', salesManager: '销售丙' })
+    ];
+    const similarFindings = evaluateRulePack(rows, today)
+      .filter((item) => item.ruleId === 'similar-name');
+    const renamedSourceFindings = evaluateRulePack(rows.map((row, index) => ({
+      ...row,
+      sourceKey: `edge-reimport:row-${index + 700}`
     })), today)
       .filter((item) => item.ruleId === 'similar-name');
 
