@@ -2,3 +2,54 @@
 .sample-download{display:inline-flex;align-items:center;gap:7px;margin:18px 0 22px;padding:9px 12px;border:1px solid #82b5b1;color:#0b585b;background:#f5fbfa;font-size:12px;font-weight:650;text-decoration:none}.field-guide{text-align:left;border-top:1px solid #e1e9e9;padding-top:19px}.field-guide h3{font-size:13px;margin:0 0 10px;color:#26373c}.field-tags{display:flex;flex-wrap:wrap;gap:7px}.field-tags span{border:1px solid #d5e2e1;background:#f7fbfb;color:#466066;padding:5px 7px;font-size:11px}.field-notes{margin-top:16px;padding-left:12px;border-left:2px solid #7cb6b2}.field-notes p{font-size:12px;line-height:1.7;margin:2px 0}.field-notes b{color:#30474d}
 .product-footer{align-items:center;border-top:1px solid #dce6e6;color:#718188;display:flex;flex-wrap:wrap;gap:10px;margin-top:28px;padding:18px 0 0;font-size:12px}.product-footer a,.footer-action{align-items:center;color:#376669;display:inline-flex;gap:5px;text-decoration:none}.product-footer a:hover,.footer-action:hover{text-decoration:underline}.footer-action{background:transparent;border:0;cursor:pointer;padding:0}.product-footer i{height:13px;width:1px;background:#cbd9d9}@media(max-width:520px){.product-footer{gap:8px;margin-top:22px}.product-footer i{display:none}.product-footer span{width:100%}}
 .storage-notice{max-width:none;margin-bottom:18px;padding:18px 20px}.storage-notice h2{margin-top:0}.storage-notice .secondary{margin-top:12px}
+
+/* Shared workbench tokens and interaction states. */
+:root {
+  --canvas: #f3f5f5;
+  --surface: #ffffff;
+  --text: #1f2d31;
+  --muted: #687a80;
+  --border: #d8e1e1;
+  --accent: #126466;
+  --accent-strong: #0b5153;
+  --risk: #a73d3d;
+  --risk-soft: #fbe9e8;
+  --review: #93600b;
+  --review-soft: #fff2d8;
+  --observation: #316b86;
+  --observation-soft: #e9f3f8;
+  color: var(--text);
+  background: var(--canvas);
+  letter-spacing: 0;
+}
+
+* { letter-spacing: 0; }
+
+body { background: var(--canvas); }
+
+button,
+input,
+select,
+textarea,
+a { border-radius: 3px; }
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+a:focus-visible {
+  outline: 3px solid #63aaa8;
+  outline-offset: 2px;
+}
+
+.primary { background: var(--accent); }
+.primary:hover { background: var(--accent-strong); }
+.secondary { min-height: 36px; }
+
+@media (max-width: 760px) {
+  .content { padding: 18px 14px 28px; }
+  .primary,
+  .secondary,
+  .upload-button,
+  .sidebar select { min-height: 44px; }
+}

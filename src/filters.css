@@ -1,6 +1,6 @@
 .analysis-filters {
   position: relative;
-  z-index: 10;
+  z-index: 20;
   margin-bottom: 18px;
   padding: 16px;
   border: 1px solid #d5e1e1;
@@ -34,6 +34,12 @@
   background: transparent;
   color: #25383d;
   font-size: 12px;
+}
+
+.filter-search:focus-within {
+  border-color: #438887;
+  outline: 3px solid #b7d9d7;
+  outline-offset: 1px;
 }
 
 .filter-topline strong {
@@ -80,7 +86,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  height: 32px;
+  min-height: 36px;
   box-sizing: border-box;
   padding: 0 10px;
   border: 1px solid #c8d7d7;
@@ -92,6 +98,11 @@
   white-space: nowrap;
 }
 
+.filter-menu summary:focus-visible {
+  outline: 3px solid #63aaa8;
+  outline-offset: 2px;
+}
+
 .filter-menu summary::-webkit-details-marker { display: none; }
 .filter-menu summary::after { content: '▾'; color: #74878b; }
 .filter-menu[open] summary { border-color: #559494; background: #edf7f6; color: #0b585b; }
@@ -101,8 +112,9 @@
   position: absolute;
   top: 37px;
   left: 0;
-  z-index: 30;
+  z-index: 40;
   width: 260px;
+  max-width: calc(100vw - 32px);
   max-height: 330px;
   padding: 10px;
   overflow: auto;
@@ -181,6 +193,14 @@
 
 .filter-chip button { display: inline-grid; place-items: center; width: 25px; height: 25px; padding: 0; border: 0; background: transparent; color: #477577; cursor: pointer; }
 
+.filter-chip button:focus-visible,
+.filter-clear:focus-visible,
+.filter-menu-actions button:focus-visible,
+.only-option:focus-visible {
+  outline: 3px solid #63aaa8;
+  outline-offset: 1px;
+}
+
 @media (max-width: 900px) {
   .filter-menu[open] { flex: 1 1 320px; min-width: 0; }
   .filter-popover { position: static; box-sizing: border-box; width: min(100%, 320px); margin-top: 4px; box-shadow: none; }
@@ -195,4 +215,22 @@
   .filter-toolbar { display: grid; grid-template-columns: 1fr; }
   .filter-menu summary { justify-content: space-between; width: 100%; }
   .filter-popover { position: static; width: auto; max-height: 280px; margin-top: 4px; box-shadow: none; }
+}
+
+@media (max-width: 760px) {
+  .analysis-filters { padding: 13px; }
+  .filter-topline { align-items: stretch; flex-direction: column; }
+  .filter-search { height: 44px; width: 100%; }
+  .filter-topline strong { margin-left: 0; white-space: normal; }
+  .filter-clear { align-self: stretch; border: 1px solid #c8d7d7; min-height: 44px; }
+  .filter-toolbar { display: grid; grid-template-columns: minmax(0, 1fr); }
+  .filter-menu[open] { min-width: 0; width: 100%; }
+  .filter-menu summary { justify-content: space-between; min-height: 44px; width: 100%; }
+  .filter-popover { box-shadow: none; max-height: 320px; max-width: 100%; position: static; width: 100%; }
+  .filter-option { min-height: 44px; }
+  .filter-option input { height: 18px; width: 18px; }
+  .only-option { min-height: 36px; min-width: 44px; }
+  .filter-chip { min-height: 34px; }
+  .filter-chip button { height: 34px; width: 34px; }
+  .amount-range input { height: 44px; }
 }
