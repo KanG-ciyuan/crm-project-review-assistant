@@ -14,7 +14,7 @@ const rows = [
 ];
 
 const workbook = Workbook.create();
-const sheet = workbook.worksheets.add('10-储备项目报备表（跟进中和呆滞）');
+const sheet = workbook.worksheets.add('分析表');
 sheet.showGridLines = false;
 sheet.getRange('A1:K1').values = [headers];
 sheet.getRange(`A2:K${rows.length + 1}`).values = rows;
@@ -38,8 +38,8 @@ await fs.mkdir(outputDir, { recursive: true });
 const output = await SpreadsheetFile.exportXlsx(workbook);
 await output.save(outputPath);
 
-const inspected = await workbook.inspect({ kind: 'table', range: '10-储备项目报备表（跟进中和呆滞）!A1:K7', include: 'values', tableMaxRows: 8, tableMaxCols: 11 });
-const preview = await workbook.render({ sheetName: '10-储备项目报备表（跟进中和呆滞）', range: 'A1:K7', scale: 1.5, format: 'png' });
+const inspected = await workbook.inspect({ kind: 'table', range: '分析表!A1:K7', include: 'values', tableMaxRows: 8, tableMaxCols: 11 });
+const preview = await workbook.render({ sheetName: '分析表', range: 'A1:K7', scale: 1.5, format: 'png' });
 await fs.writeFile(`${outputDir}CRM历史项目表-脱敏适配样表.png`, new Uint8Array(await preview.arrayBuffer()));
 console.log(inspected.ndjson);
 console.log(outputPath);

@@ -37,10 +37,10 @@ it('recognizes the CRM history profile and normalizes its confirmed field names'
     [1, '营销一部', '销售甲', '2026-06-01', '2026-07-01', 31, '项目甲', 'CRM-001', '软件项目', '跟进中', '交通', '华东', '1%-50%', 800, '2026-07-10', 'A级'],
     [2, '营销二部', '销售乙', '2026-06-02', '2026-07-02', 2, '无', '无', '在线项目', '呆滞', '水利', '华南', '81%-100%', 120, '2026-08-10', 'B级']
   ]);
-  workbook.SheetNames.push('10-储备项目报备表（跟进中和呆滞）');
-  workbook.Sheets['10-储备项目报备表（跟进中和呆滞）'] = sheet;
+  workbook.SheetNames.push('分析表');
+  workbook.Sheets['分析表'] = sheet;
 
-  const parsed = parseSelectedSheet(workbook, '10-储备项目报备表（跟进中和呆滞）');
+  const parsed = parseSelectedSheet(workbook, '分析表');
 
   expect(parsed.profile).toBe('crm-history');
   expect(parsed.validation.valid).toBe(true);
@@ -250,7 +250,7 @@ Build a workbook with the exact CRM-history header row and at least six syntheti
 ```ts
 it('parses the privacy-safe CRM history fixture without manual header renaming', () => {
   const workbook = XLSX.readFile('sample-data/CRM历史项目表-脱敏适配样表.xlsx', { cellDates: true });
-  const parsed = parseSelectedSheet(workbook, '10-储备项目报备表（跟进中和呆滞）');
+  const parsed = parseSelectedSheet(workbook, '分析表');
   expect(parsed.profile).toBe('crm-history');
   expect(parsed.validation.valid).toBe(true);
   expect(parsed.rows).toHaveLength(6);

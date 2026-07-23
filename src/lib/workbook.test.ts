@@ -65,7 +65,8 @@ describe('workbook helpers', () => {
 
   it('reads the legacy CRM history sample without fixed-profile parsing', () => {
     const workbook = XLSX.readFile('public/CRM历史项目表-脱敏适配样表.xlsx', { cellDates: true, cellNF: true });
-    const inspected = inspectSheet(workbook, '10-储备项目报备表（跟进中和呆滞）');
+    expect(workbook.SheetNames).toEqual(['分析表']);
+    const inspected = inspectSheet(workbook, '分析表');
     const headerRowIndex = inspected.matrix.findIndex((row) => row.includes('项目编码'));
     const records = readSheetRecords(inspected.matrix, headerRowIndex);
 
@@ -110,10 +111,10 @@ describe('workbook helpers', () => {
       [1, '营销一部', '销售甲', '2026-06-01', '2026-07-01', 31, '项目甲', 'CRM-001', '软件项目', '跟进中', '交通', '华东', '1%-50%', 800, '2026-07-10', 'A级'],
       [2, '营销二部', '销售乙', '2026-06-02', '2026-07-02', 2, '无', '无', '在线项目', '呆滞', '水利', '华南', '81%-100%', 120, '2026-08-10', 'B级']
     ]);
-    workbook.SheetNames.push('10-储备项目报备表（跟进中和呆滞）');
-    workbook.Sheets['10-储备项目报备表（跟进中和呆滞）'] = sheet;
+    workbook.SheetNames.push('分析表');
+    workbook.Sheets['分析表'] = sheet;
 
-    const parsed = parseSelectedSheet(workbook, '10-储备项目报备表（跟进中和呆滞）');
+    const parsed = parseSelectedSheet(workbook, '分析表');
 
     expect(parsed.profile).toBe('crm-history');
     expect(parsed.validation.valid).toBe(true);

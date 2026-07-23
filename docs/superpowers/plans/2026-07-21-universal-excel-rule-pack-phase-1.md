@@ -266,7 +266,7 @@ Add this compatibility test proving the old CRM history file can still be read a
 ```ts
 it('reads the legacy CRM history sample without fixed-profile parsing', () => {
   const workbook = XLSX.readFile('sample-data/CRM历史项目表-脱敏适配样表.xlsx', { cellDates: true });
-  const inspected = inspectSheet(workbook, '10-储备项目报备表（跟进中和呆滞）');
+  const inspected = inspectSheet(workbook, '分析表');
   const headerRowIndex = inspected.matrix.findIndex((row) => row.includes('项目编码'));
   const records = readSheetRecords(inspected.matrix, headerRowIndex);
   expect(records.length).toBeGreaterThan(0);
