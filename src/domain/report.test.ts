@@ -104,6 +104,31 @@ describe('createReviewReport', () => {
     expect(report.length).toBeLessThan(3000);
   });
 
+  it('ranks issue labels by distinct projects and ranks owners across both types', () => {
+    const rows = [
+      makeProject({ sourceKey: 'a', department: '华东部', salesManager: '销售甲' }),
+      makeProject({ sourceKey: 'b', department: '华东部', salesManager: '销售乙' }),
+      makeProject({ sourceKey: 'c', department: '华南部', salesManager: '销售乙' }),
+      makeProject({ sourceKey: 'd', department: '华北部', salesManager: '销售丙' })
+    ];
+    const makeFinding = (index: number, label: string, ruleId: string): Finding => ({
+      ruleId, rowKey: rows[index].sourceKey, projectId: rows[index].projectId, projectName: rows[index].projectName,
+      customerName: rows[index].customerName, department: rows[index].department, salesManager: rows[index].salesManager,
+      amountWan: rows[index].amount, category: '数据质量待复核', label, reason: '需要人工复核', level: 'review'
+    });
+    const report = createReviewReport(buildAnalysis(rows, [
+      makeFinding(0, '重复标签', 'a-1'), makeFinding(0, '重复标签', 'a-2'), makeFinding(1, '重复标签', 'b'),
+      makeFinding(2, '其他标签', 'c'), makeFinding(3, '第三标签', 'd')
+    ], reportDate), {}, reportDate);
+
+    expect(report).toContain('- 重复标签：涉及 2 个项目。');
+    expect(report).not.toContain('重复标签：涉及 3 个项目');
+    const peopleSection = report.split('## 三、重点部门与负责人')[1].split('## 四、规则分布摘要')[0];
+    expect(peopleSection.match(/^- /gm)).toHaveLength(5);
+    expect(peopleSection).toMatch(/部门：华东部（2 个问题项目）[\s\S]*负责人：销售乙（2 个问题项目）/);
+    expect(peopleSection).not.toContain('万元');
+  });
+
   it('keeps untrusted report fields inline and escapes markdown and html structures', () => {
     const unsafe = makeProject({
       sourceKey: 'unsafe',

@@ -41,39 +41,63 @@ function reviewCounts(analysis: AnalysisResult, reviews: ReviewRecordMap): Recor
   return counts;
 }
 
+function issueSummary(analysis: AnalysisResult) {
+  const projectsByLabel = new Map<string, Set<string>>();
+  analysis.findings.forEach((finding) => {
+    const label = finding.label.trim() || '未命名问题';
+    const projects = projectsByLabel.get(label) ?? new Set<string>();
+    projects.add(finding.rowKey);
+    projectsByLabel.set(label, projects);
+  });
+  return [...projectsByLabel].map(([label, projects]) => ({ label, projectCount: projects.size }))
+    .sort((left, right) => right.projectCount - left.projectCount || left.label.localeCompare(right.label, 'zh-CN'))
+    .slice(0, 4);
+}
+
 function renderTopBreakdown(analysis: AnalysisResult): string[] {
-  const combined = [
-    ...analysis.byDepartment.slice(0, 5).map((item) => `部门：${item.name}（${item.projectCount} 个，${formatAmount(item.amountWan)} 万元）`),
-    ...analysis.bySalesManager.slice(0, 5).map((item) => `负责人：${item.name}（${item.projectCount} 个，${formatAmount(item.amountWan)} 万元）`)
-  ];
-  return combined.length > 0 ? combined.slice(0, 5) : ['暂无部门或负责人数据。'];
+  const projectsByOwner = new Map<string, { type: '部门' | '负责人'; name: string; projects: Set<string> }>();
+  analysis.findings.filter((finding) => finding.level !== 'info').forEach((finding) => {
+    ([['部门', finding.department], ['负责人', finding.salesManager]] as const).forEach(([type, rawName]) => {
+      const name = rawName.trim() || '未填写';
+      const key = `${type}:${name}`;
+      const item = projectsByOwner.get(key) ?? { type, name, projects: new Set<string>() };
+      item.projects.add(finding.rowKey);
+      projectsByOwner.set(key, item);
+    });
+  });
+  const ranked = [...projectsByOwner.values()]
+    .sort((left, right) => right.projects.size - left.projects.size
+      || `${left.type}：${left.name}`.localeCompare(`${right.type}：${right.name}`, 'zh-CN'))
+    .slice(0, 5)
+    .map((item) => `${item.type}：${item.name}（${item.projects.size} 个问题项目）`);
+  return ranked.length > 0 ? ranked : ['暂无需要复核的部门或负责人。'];
 }
 
 export function createReviewReport(analysis: AnalysisResult, reviews: ReviewRecordMap, today: Date, filterScope: string[] = []): string {
   const { overview } = analysis;
   const scope = filterScope.map(safeMarkdownInline).filter(Boolean);
   const counts = reviewCounts(analysis, reviews);
+  const topIssues = issueSummary(analysis);
   const categorySummary = (Object.keys(categoryLabels) as FindingCategory[])
     .map((category) => {
       const findings = analysis.results[category] ?? [];
       const projects = new Set(findings.map((finding) => finding.rowKey)).size;
-      return { category, count: findings.length, projects };
+      return { category, projects };
     })
-    .filter((item) => item.count > 0)
-    .sort((left, right) => right.count - left.count || right.projects - left.projects)
-    .slice(0, 4);
+    .filter((item) => item.projects > 0)
+    .sort((left, right) => right.projects - left.projects || categoryLabels[left.category].localeCompare(categoryLabels[right.category], 'zh-CN'));
   const conclusions = [
     `本期分析 ${overview.projectCount} 个项目，储备金额 ${formatAmount(overview.totalAmountWan)} 万元。`,
     `跟进中 ${overview.inProgressCount} 个，呆滞 ${overview.dormantCount} 个，已签约 ${overview.signedCount} 个，已丢单 ${overview.lostCount} 个。`,
     `需要复核的项目共 ${counts['待复核'] + counts['确认数据错误'] + counts['确认业务风险']} 个，已忽略 ${counts['已忽略']} 个。`
   ];
-  const issues = categorySummary.length > 0
-    ? categorySummary.map((item) => `- ${categoryLabels[item.category]}：${item.count} 条发现，涉及 ${item.projects} 个项目。`)
+  const issues = topIssues.length > 0
+    ? topIssues.map((item) => `- ${safeMarkdownInline(item.label)}：涉及 ${item.projectCount} 个项目。`)
     : ['- 本期没有规则发现。'];
   const actions = [
     counts['待复核'] > 0 ? `优先复核 ${counts['待复核']} 个待复核项目，确认数据错误或业务风险。` : '持续抽查规则发现，保持数据质量。',
     counts['确认数据错误'] > 0 ? `修正已确认的 ${counts['确认数据错误']} 个数据错误，并重新分析验证。` : '对关键字段和日期保持定期校验。',
-    `围绕储备金额最高的部门和负责人，安排下一轮经营跟进。`
+    `围绕问题项目较集中的部门和负责人，安排下一轮经营跟进。`
   ];
   return [
     '# 储备项目经营复盘',
@@ -87,7 +111,7 @@ export function createReviewReport(analysis: AnalysisResult, reviews: ReviewReco
     '## 三、重点部门与负责人',
     renderTopBreakdown(analysis).map((line) => `- ${safeMarkdownInline(line)}`).join('\n'),
     '## 四、规则分布摘要',
-    [...categorySummary.map((item) => `- ${categoryLabels[item.category]}：${item.count} 条。`),
+    [...categorySummary.map((item) => `- ${categoryLabels[item.category]}：涉及 ${item.projects} 个项目。`),
       `- 复核状态：待复核 ${counts['待复核']} 个；确认数据错误 ${counts['确认数据错误']} 个；确认业务风险 ${counts['确认业务风险']} 个；已忽略 ${counts['已忽略']} 个。`].join('\n'),
     '## 五、建议行动',
     actions.map((line, index) => `${index + 1}. ${line}`).join('\n')
