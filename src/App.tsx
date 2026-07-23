@@ -9,6 +9,7 @@ import { buildAnalysis, evaluateRulePack, projectAnalysis, type AnalysisResult, 
 import { describeFilters, EMPTY_FILTERS, filterProjectKeys, type FilterState } from './domain/filters';
 import { createReviewReport, formatLocalDate } from './domain/report';
 import { loadReviewRecords, reconcileReviewRecords, saveReviewRecords, updateReviewRecord, type ReviewRecordMap, type ReviewStatus } from './domain/review';
+import { findingKind, manualReviewKeys } from './domain/workbench';
 import { inspectSheet, inspectWorkbook, type WorkbookInspection } from './lib/workbook';
 
 const suggestedSourceNamespace = (fileName: string) => fileName.replace(/\.xlsx$/i, '').trim();
@@ -37,6 +38,17 @@ export default function App() {
     () => analysis ? projectAnalysis(analysis, selectedKeys) : null,
     [analysis, selectedKeys]
   );
+  const reviewDisplayAnalysis = useMemo(() => {
+    if (!visibleAnalysis) return null;
+    const displayFindings = (findings: AnalysisResult['findings']) => findings.map((finding) =>
+      findingKind(finding) === 'manual' ? finding : { ...finding, level: 'info' as const }
+    );
+    return {
+      ...visibleAnalysis,
+      findings: displayFindings(visibleAnalysis.findings),
+      results: Object.fromEntries(Object.entries(visibleAnalysis.results).map(([category, findings]) => [category, displayFindings(findings)])) as AnalysisResult['results']
+    };
+  }, [visibleAnalysis]);
   const filterScope = useMemo(() => describeFilters(filters), [filters]);
   const generatedCurrentReport = useMemo(
     () => visibleAnalysis ? createReviewReport(visibleAnalysis, reviewRecords, new Date(), filterScope) : '',
@@ -96,7 +108,7 @@ export default function App() {
     if (mappedFields.has('amount') && payload.valueMappings.amountUnit) mappedFields.add('unit');
     const nextFindings = evaluateRulePack(payload.rows, now, { mappedFields });
     const result = buildAnalysis(payload.rows, nextFindings, now, [...mappedFields]);
-    const reviewKeys = [...new Set(nextFindings.filter((finding) => finding.level === 'review' || finding.level === 'action').map((finding) => finding.rowKey))];
+    const reviewKeys = manualReviewKeys(nextFindings);
     const nextReviews = reconcileReviewRecords(result.rows, reviewKeys, reviewRecords, now);
     persistReviews(nextReviews);
     setAnalysis(result);
@@ -180,7 +192,7 @@ export default function App() {
       {analysis && visibleAnalysis && <>
         {storageError && <section className="notice storage-notice" role="alert"><h2>自动保存失败</h2><p>{storageError}</p><button type="button" className="secondary" onClick={() => persistReviews(reviewRecords)}>重试保存</button></section>}
         <AnalysisFilters analysis={analysis} filters={filters} reviews={reviewRecords} selectedCount={selectedKeys.size} totalCount={analysis.rows.length} onChange={setFilters} />
-        <AnalysisResults analysis={visibleAnalysis} reviews={reviewRecords} onChangeReview={changeReview} />
+        {reviewDisplayAnalysis && <AnalysisResults analysis={reviewDisplayAnalysis} reviews={reviewRecords} onChangeReview={changeReview} />}
         <section className="report-card"><div className="table-heading"><div><h2>经营复盘草稿</h2><p>当前 {visibleAnalysis.rows.length} / 全部 {analysis.rows.length} 个项目</p><p>筛选范围：{filterScope.length > 0 ? filterScope.join('；').replace(/[\r\n\t]+/g, ' ').replace(/\|/g, '/') : '全部项目'}</p></div><div><button className="secondary" onClick={() => downloadReport(currentReport, '当前筛选')} disabled={!currentReport.trim()}><Download size={15} /> 导出当前筛选结果</button> <button className="secondary" onClick={() => downloadReport(allReport, '全部')} disabled={!allReport.trim()}><Download size={15} /> 导出全部结果</button></div></div><textarea value={currentReport} onChange={(event) => setCurrentReport(event.target.value)} aria-label="经营复盘草稿" /></section>
       </>}
       <footer className="product-footer">

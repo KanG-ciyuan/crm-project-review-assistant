@@ -2,6 +2,7 @@ import { amountInWan, daysBetween, projectKey, type ProbabilityBand, type Projec
 import { FINDING_CATEGORIES, type AnalysisResult } from './analysis';
 import type { FindingCategory } from './rules';
 import { REVIEW_STATUSES, type ReviewRecordMap, type ReviewStatus } from './review';
+import { manualReviewKeys } from './workbench';
 
 export interface FilterState {
   customerNames: string[];
@@ -175,12 +176,11 @@ export function filterProjectKeys(
 ): Set<string> {
   const today = analysisDate(analysis);
   const findingsByRow = new Map<string, typeof analysis.findings>();
-  const actionableRowKeys = new Set<string>();
+  const actionableRowKeys = new Set(manualReviewKeys(analysis.findings));
   for (const finding of analysis.findings) {
     const list = findingsByRow.get(finding.rowKey) ?? [];
     list.push(finding);
     findingsByRow.set(finding.rowKey, list);
-    if (finding.level === 'review' || finding.level === 'action') actionableRowKeys.add(finding.rowKey);
   }
 
   return new Set(analysis.rows.filter((row) => {
@@ -255,11 +255,7 @@ export function buildFilterOptions(analysis: AnalysisResult, filters: FilterStat
     if (values.size <= 20) customFields[field] = [...values].sort((left, right) => left.localeCompare(right, 'zh-CN'));
   }
   const categoryCounts = new Map(countFindings(analysis, 'category').map((item) => [item.value, item.count]));
-  const actionableRowKeys = new Set(
-    analysis.findings
-      .filter((finding) => finding.level === 'review' || finding.level === 'action')
-      .map((finding) => finding.rowKey)
-  );
+  const actionableRowKeys = new Set(manualReviewKeys(analysis.findings));
   const reviewValues = analysis.rows.flatMap((row) => {
     const status = actionableReviewStatus(actionableRowKeys, reviews, projectKey(row));
     return status ? [status] : [];

@@ -138,12 +138,30 @@ it('runs a simple workbook through the smart import path', async () => {
   expect(screen.getByRole('heading', { name: '数据质量待复核' })).toBeInTheDocument();
 });
 
+it('does not create a review status control for objective fact findings', async () => {
+  const user = userEvent.setup();
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([
+    ['项目编号', '项目名称', '销售经理', '储备金额', '金额单位', '最近跟进日期'],
+    ['FACT-1', '超期项目', '销售甲', 5000, '万元', '2026-06-01']
+  ]), '商机表');
+  vi.spyOn(workbookApi, 'inspectWorkbook').mockResolvedValue({ workbook, sheetNames: ['商机表'] });
+
+  render(<App />);
+  await user.upload(screen.getByLabelText('选择 .xlsx 文件'), new File(['content'], '商机.xlsx'));
+  await user.click(await screen.findByRole('button', { name: '开始分析' }));
+
+  expect(screen.getByText('跟进超期')).toBeInTheDocument();
+  expect(screen.queryByLabelText('FACT-1 审查状态')).not.toBeInTheDocument();
+});
+
 it('keeps review input visible and offers retry when browser storage fails', async () => {
   const user = userEvent.setup();
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([
-    ['项目编号', '项目名称', '储备金额', '金额单位'],
-    ['SAVE-1', '待保存项目', 0, '万元']
+    ['项目编号', '项目名称', '销售经理', '储备金额', '金额单位'],
+    ['SAVE-1', '待保存项目', '销售甲', 0, '万元'],
+    ['SAVE-1', '待保存项目副本', '销售甲', 0, '万元']
   ]), '商机表');
   vi.spyOn(workbookApi, 'inspectWorkbook').mockResolvedValue({ workbook, sheetNames: ['商机表'] });
   vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('quota'); });
@@ -151,7 +169,7 @@ it('keeps review input visible and offers retry when browser storage fails', asy
   render(<App />);
   await user.upload(screen.getByLabelText('选择 .xlsx 文件'), new File(['content'], '商机.xlsx'));
   await user.click(await screen.findByRole('button', { name: '开始分析' }));
-  const status = screen.getByLabelText('SAVE-1 审查状态');
+  const status = screen.getAllByLabelText('SAVE-1 审查状态')[0];
   await user.selectOptions(status, '确认数据错误');
 
   expect(status).toHaveValue('确认数据错误');
@@ -337,8 +355,9 @@ it('isolates review decisions by confirmed data source instead of file name', as
   window.localStorage.clear();
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([
-    ['项目编号', '项目名称', '储备金额'],
-    ['SAME-1', '同编号待复核项目', 0]
+    ['项目编号', '项目名称', '销售经理', '储备金额'],
+    ['SAME-1', '同编号待复核项目', '销售甲', 0],
+    ['SAME-1', '同编号待复核项目副本', '销售甲', 0]
   ]), '商机表');
   vi.spyOn(workbookApi, 'inspectWorkbook').mockResolvedValue({ workbook, sheetNames: ['商机表'] });
 
@@ -357,25 +376,25 @@ it('isolates review decisions by confirmed data source instead of file name', as
   await user.upload(input, new File(['first'], '同名项目台账.xlsx'));
   await setSource('客户甲 CRM账套');
   await analyze();
-  const firstReview = screen.getByLabelText('SAME-1 审查状态');
+  const firstReview = screen.getAllByLabelText('SAME-1 审查状态')[0];
   await user.selectOptions(firstReview, '已忽略');
   expect(firstReview).toHaveValue('已忽略');
 
   await user.upload(input, new File(['second'], '同名项目台账.xlsx'));
   await setSource('客户乙 CRM账套');
   await analyze();
-  expect(screen.getByLabelText('SAME-1 审查状态')).toHaveValue('待复核');
+  expect(screen.getAllByLabelText('SAME-1 审查状态')[0]).toHaveValue('待复核');
 
   await setSource('客户甲 CRM账套');
   expect(screen.queryByRole('heading', { name: '数据质量待复核' })).not.toBeInTheDocument();
   expect(screen.getByRole('heading', { name: '有 1 项需要确认' })).toBeInTheDocument();
   await analyze();
-  expect(screen.getByLabelText('SAME-1 审查状态')).toHaveValue('已忽略');
+  expect(screen.getAllByLabelText('SAME-1 审查状态')[0]).toHaveValue('已忽略');
 
   await user.upload(input, new File(['renamed'], '已改名台账.xlsx'));
   await setSource('客户甲 CRM账套');
   await analyze();
-  expect(screen.getByLabelText('SAME-1 审查状态')).toHaveValue('已忽略');
+  expect(screen.getAllByLabelText('SAME-1 审查状态')[0]).toHaveValue('已忽略');
 });
 
 it('requires a nonblank confirmed data source before opening the import wizard', async () => {

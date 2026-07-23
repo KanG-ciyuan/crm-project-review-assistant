@@ -71,7 +71,7 @@ describe('global analysis filters', () => {
       reviewStatuses: ['待复核']
     };
 
-    expect(filterProjectKeys(analysis, reviews, filters)).toEqual(new Set(['a']));
+    expect(filterProjectKeys(analysis, reviews, filters)).toEqual(new Set());
     expect(describeFilters(filters)).toEqual(expect.arrayContaining([
       '关键词：hospitalalpha', '标签：跟进超期', '审查状态：待复核'
     ]));
@@ -153,7 +153,38 @@ describe('global analysis filters', () => {
 
     expect(AMOUNT_BANDS.map((band) => band.value)).toEqual(['普通', '大额', '超大', '极端', '金额异常']);
     expect(options.labels.map((item) => item.value)).toContain('跟进超期');
-    expect(filterProjectKeys(analysis, {}, { ...EMPTY_FILTERS, reviewStatuses: ['待复核'] })).toEqual(new Set(['overdue']));
+    expect(filterProjectKeys(analysis, {}, { ...EMPTY_FILTERS, reviewStatuses: ['待复核'] })).toEqual(new Set());
+  });
+
+  it('limits review status options and filtering to ambiguous manual findings', () => {
+    const row = makeProject({ sourceKey: 'fact', amount: 100, lastFollowUpAt: '2026-06-01' });
+    const analysis = buildAnalysis([row], evaluateRulePack([row], today), today);
+
+    expect(analysis.findings.some((finding) => finding.ruleId === 'follow-up-overdue')).toBe(true);
+    expect(buildFilterOptions(analysis, EMPTY_FILTERS).reviewStatuses).toEqual([
+      { value: '待复核', count: 0 },
+      { value: '确认数据错误', count: 0 },
+      { value: '确认业务风险', count: 0 },
+      { value: '已忽略', count: 0 }
+    ]);
+    expect(filterProjectKeys(analysis, {}, { ...EMPTY_FILTERS, reviewStatuses: ['待复核'] })).toEqual(new Set());
+  });
+
+  it('uses manual finding keys for status filtering even when finding level is informational', () => {
+    const row = makeProject({ sourceKey: 'duplicate', projectId: 'DUP-1' });
+    const finding: Finding = {
+      ruleId: 'duplicate-project', rowKey: 'duplicate', projectId: row.projectId,
+      projectName: row.projectName, customerName: row.customerName,
+      department: row.department, salesManager: row.salesManager, amountWan: row.amount,
+      label: '重复项目待核验', category: '数据质量待复核', level: 'info', reason: '测试'
+    };
+    const analysis = buildAnalysis([row], [finding], today);
+    const reviews: ReviewRecordMap = { duplicate: {
+      projectId: row.projectId, projectName: row.projectName, status: '确认业务风险', note: '',
+      firstReviewedAt: today.toISOString(), lastReviewedAt: today.toISOString(), fingerprint: 'test', dataUpdated: false, history: []
+    }};
+
+    expect(filterProjectKeys(analysis, reviews, { ...EMPTY_FILTERS, reviewStatuses: ['确认业务风险'] })).toEqual(new Set(['duplicate']));
   });
 
   it('counts explicit review states and classifies zero amounts as abnormal', () => {
@@ -170,7 +201,7 @@ describe('global analysis filters', () => {
     const options = buildFilterOptions(analysis, EMPTY_FILTERS, reviews);
 
     expect(options.amountBands).toContainEqual({ value: '金额异常', count: 1 });
-    expect(options.reviewStatuses).toContainEqual({ value: '确认数据错误', count: 1 });
+    expect(options.reviewStatuses).toContainEqual({ value: '确认数据错误', count: 0 });
     expect(options.reviewStatuses).toContainEqual({ value: '待复核', count: 0 });
   });
 
@@ -198,9 +229,9 @@ describe('global analysis filters', () => {
     };
 
     expect(filterProjectKeys(analysis, reviews, { ...EMPTY_FILTERS, reviewStatuses: ['确认业务风险'] })).toEqual(new Set());
-    expect(filterProjectKeys(analysis, reviews, { ...EMPTY_FILTERS, reviewStatuses: ['待复核'] })).toEqual(new Set(['action']));
+    expect(filterProjectKeys(analysis, reviews, { ...EMPTY_FILTERS, reviewStatuses: ['待复核'] })).toEqual(new Set());
     expect(buildFilterOptions(analysis, EMPTY_FILTERS, reviews).reviewStatuses).toEqual([
-      { value: '待复核', count: 1 },
+      { value: '待复核', count: 0 },
       { value: '确认数据错误', count: 0 },
       { value: '确认业务风险', count: 0 },
       { value: '已忽略', count: 0 }
