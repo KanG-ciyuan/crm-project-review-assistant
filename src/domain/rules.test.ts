@@ -292,6 +292,74 @@ describe('confirmed To B rule pack', () => {
     ]));
   });
 
+  it('links every duplicate record in the same project-code group with one stable key', () => {
+    const rows = [
+      makeProject({ sourceKey: 'record-a', projectId: 'DUP-1', projectName: '项目甲' }),
+      makeProject({ sourceKey: 'record-b', projectId: 'DUP-1', projectName: '项目乙' }),
+      makeProject({ sourceKey: 'record-c', projectId: 'DUP-1', projectName: '项目丙' })
+    ];
+    const relationKeys = evaluateRulePack(rows, today)
+      .filter((item) => item.ruleId === 'duplicate-record')
+      .map((item) => item.relationKey);
+    const reversedRelationKeys = evaluateRulePack([...rows].reverse(), today)
+      .filter((item) => item.ruleId === 'duplicate-record')
+      .map((item) => item.relationKey);
+
+    expect(relationKeys).toHaveLength(3);
+    expect(new Set(relationKeys)).toEqual(new Set(['duplicate-record:record-a\u0000record-b\u0000record-c']));
+    expect(new Set(reversedRelationKeys)).toEqual(new Set(relationKeys));
+  });
+
+  it('links both ends of an exact same-seller duplicate-project pair with a stable typed key', () => {
+    const rows = [
+      makeProject({ sourceKey: 'project-a', projectId: 'NEW-1', customerName: '客户三', projectName: '同一项目', salesManager: '销售甲' }),
+      makeProject({ sourceKey: 'project-b', projectId: 'NEW-2', customerName: '客户三', projectName: '同一 项目', salesManager: '销售甲' })
+    ];
+    const relationKeys = evaluateRulePack(rows, today)
+      .filter((item) => item.ruleId === 'duplicate-project')
+      .map((item) => item.relationKey);
+    const reversedRelationKeys = evaluateRulePack([...rows].reverse(), today)
+      .filter((item) => item.ruleId === 'duplicate-project')
+      .map((item) => item.relationKey);
+
+    expect(relationKeys).toEqual([
+      'duplicate-project:project-a\u0000project-b',
+      'duplicate-project:project-a\u0000project-b'
+    ]);
+    expect(new Set(reversedRelationKeys)).toEqual(new Set(relationKeys));
+  });
+
+  it('links both ends of an exact cross-seller collision pair without merging rule types', () => {
+    const rows = [
+      makeProject({ sourceKey: 'collision-a', projectId: 'NEW-3', customerName: '客户四', projectName: '撞单项目', salesManager: '销售甲' }),
+      makeProject({ sourceKey: 'collision-b', projectId: 'NEW-4', customerName: '客户四', projectName: '撞单项目', salesManager: '销售乙' })
+    ];
+    const relationKeys = evaluateRulePack(rows, today)
+      .filter((item) => item.ruleId === 'cross-seller-collision')
+      .map((item) => item.relationKey);
+
+    expect(relationKeys).toEqual([
+      'cross-seller-collision:collision-a\u0000collision-b',
+      'cross-seller-collision:collision-a\u0000collision-b'
+    ]);
+    expect(relationKeys.every((key) => key !== 'duplicate-project:collision-a\u0000collision-b')).toBe(true);
+  });
+
+  it('prefixes existing similar-name pair relationships with their rule type', () => {
+    const rows = [
+      makeProject({ sourceKey: 'similar-a', projectId: 'S-1', projectName: '华城医院数字化改造项目' }),
+      makeProject({ sourceKey: 'similar-b', projectId: 'S-2', projectName: '华城医院数字化改造工程' })
+    ];
+    const relationKeys = evaluateRulePack(rows, today)
+      .filter((item) => item.ruleId === 'similar-name')
+      .map((item) => item.relationKey);
+
+    expect(relationKeys).toEqual([
+      'similar-name:similar-a\u0000similar-b',
+      'similar-name:similar-a\u0000similar-b'
+    ]);
+  });
+
   it('reports blank mapped identity and ownership fields with specific Chinese names', () => {
     const findings = evaluateRulePack([
       makeProject({ projectId: '', projectName: ' ', customerName: '', department: '', salesManager: '' })
