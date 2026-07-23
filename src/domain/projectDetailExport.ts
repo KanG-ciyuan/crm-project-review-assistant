@@ -33,6 +33,16 @@ const COLUMN_WIDTHS = [
   14, 14, 14, 34, 34, 34, 38, 48, 24, 30
 ];
 
+const EXCEL_TEXT_LIMIT = 32_767;
+const TRUNCATION_SUFFIX = '……（内容已截断）';
+
+function protectExcelCell(value: string | number | null | undefined): string | number {
+  if (typeof value === 'number') return value;
+  const text = value ?? '';
+  if (text.length <= EXCEL_TEXT_LIMIT) return text;
+  return `${text.slice(0, EXCEL_TEXT_LIMIT - TRUNCATION_SUFFIX.length)}${TRUNCATION_SUFFIX}`;
+}
+
 function formatFinding(finding: Finding): string {
   const label = finding.label.trim();
   const reason = finding.reason.trim();
@@ -86,7 +96,8 @@ export function createProjectDetailWorkbook(
       review?.note ?? ''
     ];
   });
-  const worksheet = XLSX.utils.aoa_to_sheet([[...HEADERS], ...body]);
+  const matrix = [[...HEADERS], ...body].map((row) => row.map(protectExcelCell));
+  const worksheet = XLSX.utils.aoa_to_sheet(matrix);
   worksheet['!cols'] = COLUMN_WIDTHS.map((wch) => ({ wch }));
 
   const workbook = XLSX.utils.book_new();

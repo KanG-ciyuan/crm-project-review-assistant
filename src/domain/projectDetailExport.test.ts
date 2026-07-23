@@ -166,4 +166,72 @@ describe('createProjectDetailWorkbook', () => {
     expect(widths?.slice(0, 13).every((width) => typeof width === 'number' && width >= 10)).toBe(true);
     expect(widths?.slice(13).every((width) => typeof width === 'number' && width >= 24)).toBe(true);
   });
+
+  it('truncates every oversized text cell before writing a round-trip-safe xlsx file', () => {
+    const oversized = '超长内容'.repeat(10_000);
+    const fact = finding('follow-up-overdue', oversized, oversized, 'oversized-row');
+    const manual = finding('similar-name', oversized, oversized, 'oversized-row');
+    const observation = finding('reserve-cycle', oversized, oversized, 'oversized-row');
+    const row: ProjectWorkbenchRow = {
+      rowKey: 'oversized-row',
+      project: makeProject({
+        sourceKey: 'oversized-row',
+        department: oversized,
+        salesManager: oversized,
+        customerName: oversized,
+        projectId: oversized,
+        projectName: oversized
+      }),
+      findings: [fact, manual, observation],
+      factFindings: [fact],
+      manualFindings: [manual],
+      observationFindings: [observation],
+      relatedProjects: [{
+        rowKey: 'related-row',
+        projectId: oversized,
+        projectName: oversized,
+        customerName: oversized,
+        salesManager: oversized,
+        relationKey: 'oversized-relation',
+        ruleId: 'similar-name',
+        relationLabel: oversized
+      }],
+      followUpOverdueDays: null,
+      signingOverdueDays: null,
+      priority: 0
+    };
+    const reviews: ReviewRecordMap = {
+      'oversized-row': {
+        projectId: oversized,
+        projectName: oversized,
+        status: '确认业务风险',
+        note: oversized,
+        firstReviewedAt: '2026-07-21T09:00:00.000Z',
+        lastReviewedAt: '2026-07-22T09:00:00.000Z',
+        fingerprint: 'oversized',
+        dataUpdated: false,
+        history: []
+      }
+    };
+    const workbook = createProjectDetailWorkbook([row], reviews);
+    let bytes: ArrayBuffer | undefined;
+
+    expect(() => {
+      bytes = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+    }).not.toThrow();
+
+    const roundTripped = XLSX.read(bytes as ArrayBuffer, { type: 'array' });
+    const exported = worksheetRows(roundTripped)[0];
+    const protectedColumns = [
+      '部门', '销售经理', '客户名称', '项目编码', '项目名称',
+      '客观事实', '人工核验问题', '经营观察', '全部分析结果', '关联项目', '处理说明'
+    ];
+
+    for (const column of protectedColumns) {
+      const value = exported[column];
+      expect(typeof value, column).toBe('string');
+      expect(String(value).length, column).toBeLessThanOrEqual(32_767);
+      expect(String(value), column).toContain('……（内容已截断）');
+    }
+  });
 });
