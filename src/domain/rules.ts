@@ -309,26 +309,22 @@ function conservativeSimilarity(left: string, right: string) {
   return (2 * overlap) / (leftPairs.length + rightPairs.length) >= 0.75;
 }
 
-function normalizedProjectId(value: string) {
-  return value.normalize('NFKC').toLocaleLowerCase('zh-CN').trim();
-}
-
 function businessRelationKey(ruleId: string, parts: string[]) {
   return `${ruleId}:${parts.join('\u0000')}`;
 }
 
 function stableProjectIdentity(row: ProjectRow) {
-  const projectId = normalizedProjectId(row.projectId);
+  const projectId = row.projectId.trim();
   if (projectId) return `project-id:${projectId}`;
   return businessRelationKey('project-fields', [
-    normalizedCustomer(row.customerName),
-    normalizeProjectName(row.projectName),
-    normalizedCustomer(row.salesManager),
-    normalizedCustomer(row.department),
-    normalizedCustomer(row.industry),
-    normalizedCustomer(row.region),
-    normalizedCustomer(row.projectType),
-    normalizedCustomer(row.projectLevel),
+    row.customerName.trim(),
+    row.projectName.trim(),
+    row.salesManager.trim(),
+    row.department.trim(),
+    row.industry.trim(),
+    row.region.trim(),
+    row.projectType.trim(),
+    row.projectLevel.trim(),
     row.createdAt?.trim() ?? ''
   ]);
 }
@@ -348,9 +344,9 @@ function evaluateDuplicates(rows: ProjectRow[]): Finding[] {
     }
   }
 
-  for (const group of byId.values()) {
+  for (const [projectId, group] of byId) {
     if (group.length < 2) continue;
-    const relationKey = businessRelationKey('duplicate-record', [normalizedProjectId(group[0].projectId)]);
+    const relationKey = businessRelationKey('duplicate-record', [projectId]);
     results.push(...group.map((row) => ({
       ...finding(row, 'duplicate-record', '数据质量待复核', '重复记录待核实', '相同项目编码出现多条记录，需检查 CRM 导出或数据重复', 'review'),
       relationKey
@@ -370,7 +366,7 @@ function evaluateDuplicates(rows: ProjectRow[]): Finding[] {
             [
               normalizedCustomer(left.customerName),
               normalizeProjectName(left.projectName),
-              normalizedCustomer(left.salesManager)
+              left.salesManager.trim()
             ]
           );
           results.push({ ...finding(left, 'duplicate-project', '疑似重复与撞单', '疑似重复立项', '同一销售在同一客户下存在规范化后同名的不同项目编码', 'review'), relationKey });

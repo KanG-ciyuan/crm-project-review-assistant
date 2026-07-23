@@ -315,8 +315,20 @@ describe('confirmed To B rule pack', () => {
       .map((item) => item.relationKey);
 
     expect(relationKeys).toHaveLength(3);
-    expect(new Set(relationKeys)).toEqual(new Set(['duplicate-record:dup-1']));
+    expect(new Set(relationKeys)).toEqual(new Set(['duplicate-record:DUP-1']));
     expect(new Set(renamedSourceRelationKeys)).toEqual(new Set(relationKeys));
+  });
+
+  it('does not merge duplicate-record relation keys across case-distinct project-code groups', () => {
+    const findings = evaluateRulePack([
+      makeProject({ sourceKey: 'upper-a', projectId: 'ABC', projectName: '大写项目甲' }),
+      makeProject({ sourceKey: 'upper-b', projectId: 'ABC', projectName: '大写项目乙' }),
+      makeProject({ sourceKey: 'lower-a', projectId: 'abc', projectName: '小写项目甲' }),
+      makeProject({ sourceKey: 'lower-b', projectId: 'abc', projectName: '小写项目乙' })
+    ], today).filter((item) => item.ruleId === 'duplicate-record');
+
+    expect(findings).toHaveLength(4);
+    expect(new Set(findings.map((item) => item.relationKey)).size).toBe(2);
   });
 
   it('links both ends of an exact same-seller duplicate-project pair with a stable typed key', () => {
@@ -338,6 +350,18 @@ describe('confirmed To B rule pack', () => {
     expect(new Set(relationKeys).size).toBe(1);
     expect(relationKeys[0]).toMatch(/^duplicate-project:/);
     expect(new Set(renamedSourceRelationKeys)).toEqual(new Set(relationKeys));
+  });
+
+  it('does not merge duplicate-project relation keys across exact seller groups', () => {
+    const findings = evaluateRulePack([
+      makeProject({ sourceKey: 'seller-compact-a', projectId: 'SELLER-1', customerName: '客户五', projectName: '同名项目', salesManager: '销售甲' }),
+      makeProject({ sourceKey: 'seller-compact-b', projectId: 'SELLER-2', customerName: '客户五', projectName: '同名项目', salesManager: '销售甲' }),
+      makeProject({ sourceKey: 'seller-spaced-a', projectId: 'SELLER-3', customerName: '客户五', projectName: '同名项目', salesManager: '销售 甲' }),
+      makeProject({ sourceKey: 'seller-spaced-b', projectId: 'SELLER-4', customerName: '客户五', projectName: '同名项目', salesManager: '销售 甲' })
+    ], today).filter((item) => item.ruleId === 'duplicate-project');
+
+    expect(findings).toHaveLength(4);
+    expect(new Set(findings.map((item) => item.relationKey)).size).toBe(2);
   });
 
   it('links both ends of an exact cross-seller collision pair without merging rule types', () => {
@@ -384,8 +408,8 @@ describe('confirmed To B rule pack', () => {
 
   it('keeps separate stable similar-name pairs when normalized names repeat across business records', () => {
     const rows = [
-      makeProject({ sourceKey: 'same-name-a', projectId: 'SIM-A', projectName: '华城医院数字化改造项目', salesManager: '销售甲' }),
-      makeProject({ sourceKey: 'same-name-b', projectId: 'SIM-B', projectName: '华城医院数字化改造项目', salesManager: '销售乙' }),
+      makeProject({ sourceKey: 'same-name-a', projectId: 'SIM-X', projectName: '华城医院数字化改造项目', salesManager: '销售甲' }),
+      makeProject({ sourceKey: 'same-name-b', projectId: 'sim-x', projectName: '华城医院数字化改造项目', salesManager: '销售乙' }),
       makeProject({ sourceKey: 'similar-third', projectId: 'SIM-C', projectName: '华城医院数字化改造工程', salesManager: '销售丙' })
     ];
     const similarFindings = evaluateRulePack(rows, today)
