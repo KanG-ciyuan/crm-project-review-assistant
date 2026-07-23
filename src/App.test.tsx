@@ -103,11 +103,13 @@ it('restarts the wizard when a same-name file and sheet are uploaded again', asy
   const input = screen.getByLabelText('选择 .xlsx 文件');
   await user.upload(input, new File(['first'], '商机.xlsx'));
   await user.click(await screen.findByRole('button', { name: '开始分析' }));
+  await user.click(screen.getByRole('tab', { name: '项目问题清单' }));
   expect(screen.getByText('旧项目')).toBeInTheDocument();
 
   await user.upload(input, new File(['second'], '商机.xlsx'));
   expect(screen.queryByLabelText('经营复盘草稿')).not.toBeInTheDocument();
   await user.click(await screen.findByRole('button', { name: '开始分析' }));
+  await user.click(screen.getByRole('tab', { name: '项目问题清单' }));
   expect(screen.getByText('新项目')).toBeInTheDocument();
 });
 
@@ -135,7 +137,7 @@ it('runs a simple workbook through the smart import path', async () => {
   render(<App />);
   await user.upload(screen.getByLabelText('选择 .xlsx 文件'), new File(['content'], '商机.xlsx'));
   await user.click(await screen.findByRole('button', { name: '开始分析' }));
-  expect(screen.getByRole('heading', { name: '数据质量待复核' })).toBeInTheDocument();
+  expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual(['分析总览', '项目问题清单', '复盘摘要']);
 });
 
 it('does not create a review status control for objective fact findings', async () => {
@@ -150,6 +152,7 @@ it('does not create a review status control for objective fact findings', async 
   render(<App />);
   await user.upload(screen.getByLabelText('选择 .xlsx 文件'), new File(['content'], '商机.xlsx'));
   await user.click(await screen.findByRole('button', { name: '开始分析' }));
+  await user.click(screen.getByRole('tab', { name: '项目问题清单' }));
 
   expect(screen.getByText('跟进超期')).toBeInTheDocument();
   expect(screen.queryByLabelText('FACT-1 审查状态')).not.toBeInTheDocument();
@@ -169,12 +172,16 @@ it('keeps review input visible and offers retry when browser storage fails', asy
   render(<App />);
   await user.upload(screen.getByLabelText('选择 .xlsx 文件'), new File(['content'], '商机.xlsx'));
   await user.click(await screen.findByRole('button', { name: '开始分析' }));
+  await user.click(screen.getByRole('tab', { name: '项目问题清单' }));
   const status = screen.getAllByLabelText('SAVE-1 审查状态')[0];
   await user.selectOptions(status, '确认数据错误');
 
   expect(status).toHaveValue('确认数据错误');
   expect(screen.getByRole('alert')).toHaveTextContent('自动保存失败');
   expect(screen.getByRole('button', { name: '重试保存' })).toBeInTheDocument();
+  await user.click(screen.getByRole('tab', { name: '复盘摘要' }));
+  const confirmedRow = screen.getByText('确认数据错误').closest('tr')!;
+  expect(within(confirmedRow).getByText('1')).toBeInTheDocument();
 });
 
 it('runs the confirmed 30-day rule pack and removes the legacy percentile rule', async () => {
@@ -195,11 +202,12 @@ it('runs the confirmed 30-day rule pack and removes the legacy percentile rule',
   await user.upload(screen.getByLabelText('选择 .xlsx 文件'), new File(['content'], '商机.xlsx'));
   await user.selectOptions(await screen.findByLabelText('金额单位'), '万元');
   await user.click(screen.getByRole('button', { name: '开始分析' }));
+  await user.click(screen.getByRole('tab', { name: '项目问题清单' }));
 
-  const resultsTable = within(screen.getByRole('region', { name: '维护超期待整改' })).getByRole('table');
+  const resultsTable = screen.getByRole('table');
   expect(within(resultsTable).getAllByText('跟进超期')).toHaveLength(1);
   expect(within(within(resultsTable).getByText('31天项目').closest('tr')!).getByText('跟进超期')).toBeInTheDocument();
-  expect(within(resultsTable).queryByText('21天项目')).not.toBeInTheDocument();
+  expect(within(within(resultsTable).getByText('21天项目').closest('tr')!).queryByText('跟进超期')).not.toBeInTheDocument();
   expect(screen.queryByText('高金额低确定性')).not.toBeInTheDocument();
 });
 
@@ -222,22 +230,21 @@ it('projects one global filter across metrics and result areas without changing 
 
   const projectCountMetric = screen.getByText('项目总数').closest('article')!;
   expect(within(projectCountMetric).getByText('2')).toBeInTheDocument();
-  const maintenance = screen.getByRole('region', { name: '维护超期待整改' });
-  expect(within(maintenance).getByText('华东超期项目')).toBeInTheDocument();
-  expect(within(maintenance).getByText('华南超期项目')).toBeInTheDocument();
+  await user.click(screen.getByRole('tab', { name: '项目问题清单' }));
+  expect(screen.getByText('华东超期项目')).toBeInTheDocument();
+  expect(screen.getByText('华南超期项目')).toBeInTheDocument();
 
   await user.click(screen.getByRole('checkbox', { name: '华东部 1个项目' }));
-  expect(screen.getByText('当前筛选 1 / 全部 2 个项目')).toBeInTheDocument();
-  expect(within(projectCountMetric).getByText('1')).toBeInTheDocument();
-  expect(within(maintenance).getByText('华东超期项目')).toBeInTheDocument();
-  expect(within(maintenance).queryByText('华南超期项目')).not.toBeInTheDocument();
-  const reportValue = (screen.getByLabelText('经营复盘草稿') as HTMLTextAreaElement).value;
-  expect(screen.getByText('当前 1 / 全部 2 个项目')).toBeInTheDocument();
+  expect(screen.getAllByText('当前筛选 1 / 全部 2 个项目')).toHaveLength(2);
+  expect(screen.getByText('华东超期项目')).toBeInTheDocument();
+  expect(screen.queryByText('华南超期项目')).not.toBeInTheDocument();
+  await user.click(screen.getByRole('checkbox', { name: '选择项目 EAST' }));
+  await user.click(screen.getByRole('tab', { name: '分析总览' }));
+  expect(within(screen.getByText('项目总数').closest('article')!).getByText('1')).toBeInTheDocument();
+  await user.click(screen.getByRole('tab', { name: '复盘摘要' }));
   expect(screen.getByText('筛选范围：部门：华东部')).toBeInTheDocument();
-  expect(reportValue).toContain('跟进超期：涉及 1 个项目');
-  expect(reportValue).not.toContain('华东超期项目');
-  expect(reportValue).not.toContain('华南超期项目');
-  expect(reportValue).toContain('筛选范围：部门：华东部');
+  expect(screen.getByText('跟进超期：涉及 1 个项目。')).toBeInTheDocument();
+  expect(screen.queryByLabelText('经营复盘草稿')).not.toBeInTheDocument();
 
   const createdUrls: string[] = [];
   const exportedBlobs: Blob[] = [];
@@ -258,13 +265,13 @@ it('projects one global filter across metrics and result areas without changing 
     downloadedNames.push(this.download);
   });
 
-  fireEvent.click(screen.getByRole('button', { name: '导出当前筛选结果' }));
-  fireEvent.click(screen.getByRole('button', { name: '导出全部结果' }));
+  fireEvent.click(screen.getByRole('button', { name: '下载复盘摘要.md' }));
+  fireEvent.click(screen.getByRole('button', { name: '导出项目明细.xlsx' }));
 
   const expectedLocalDate = formatLocalDate(new Date());
   expect(downloadedNames).toEqual([
     `储备项目经营复盘-${expectedLocalDate}-当前筛选.md`,
-    `储备项目经营复盘-${expectedLocalDate}-全部.md`
+    `CRM项目分析明细-${expectedLocalDate}-所选1个项目.xlsx`
   ]);
   expect(attachedDuringClick).toEqual([true, true]);
   expect(downloadedAnchors.every((anchor) => !anchor.isConnected)).toBe(true);
@@ -279,20 +286,20 @@ it('projects one global filter across metrics and result areas without changing 
     reader.readAsText(blob);
   });
   const currentExport = await readBlob(exportedBlobs[0]);
-  const allExport = await readBlob(exportedBlobs[1]);
   expect(currentExport).toContain('筛选范围：部门：华东部');
   expect(currentExport).toContain('跟进超期：涉及 1 个项目');
   expect(currentExport).not.toContain('华东超期项目');
   expect(currentExport).not.toContain('华南超期项目');
-  expect(allExport).toContain('跟进超期：涉及 2 个项目');
-  expect(allExport).not.toContain('华东超期项目');
-  expect(allExport).not.toContain('华南超期项目');
-  expect(allExport).not.toContain('筛选范围：');
+  const excelBytes = await exportedBlobs[1].arrayBuffer();
+  const exportedWorkbook = XLSX.read(excelBytes);
+  const exportedRows = XLSX.utils.sheet_to_json<Record<string, string>>(exportedWorkbook.Sheets['项目明细']);
+  expect(exportedRows).toHaveLength(1);
+  expect(exportedRows[0]['项目编码']).toBe('EAST');
 
+  await user.click(screen.getByRole('tab', { name: '项目问题清单' }));
   await user.click(screen.getByRole('button', { name: '清除全部筛选' }));
-  expect(screen.getByText('当前筛选 2 / 全部 2 个项目')).toBeInTheDocument();
-  expect(within(projectCountMetric).getByText('2')).toBeInTheDocument();
-  expect(within(maintenance).getByText('华南超期项目')).toBeInTheDocument();
+  expect(screen.getAllByText('当前筛选 2 / 全部 2 个项目')).toHaveLength(2);
+  expect(screen.getByText('华南超期项目')).toBeInTheDocument();
 });
 
 it('analyzes an arbitrary Excel workflow and keeps seller filters, findings, metrics, and report in sync', async () => {
@@ -323,31 +330,34 @@ it('analyzes an arbitrary Excel workflow and keeps seller filters, findings, met
   await user.selectOptions(screen.getByLabelText('金额单位'), '万元');
   await user.click(screen.getByRole('button', { name: '开始分析' }));
 
-  const overview = screen.getByRole('region', { name: '经营概览' });
+  const overview = screen.getByRole('region', { name: '分析总览指标' });
   const projectCountMetric = within(overview).getByText('项目总数').closest('article')!;
   const amountMetric = within(overview).getByText('储备金额').closest('article')!;
   expect(screen.getByText('当前筛选 3 / 全部 3 个项目')).toBeInTheDocument();
   expect(within(projectCountMetric).getByText('3')).toBeInTheDocument();
   expect(within(amountMetric).getByText('600')).toBeInTheDocument();
-  const maintenance = screen.getByRole('region', { name: '维护超期待整改' });
-  expect(within(maintenance).getByText('甲方超期商机')).toBeInTheDocument();
-  expect(within(maintenance).getByText('跟进超期')).toBeInTheDocument();
+  await user.click(screen.getByRole('tab', { name: '项目问题清单' }));
+  expect(screen.getByText('甲方超期商机')).toBeInTheDocument();
+  expect(screen.getAllByText('跟进超期').length).toBeGreaterThan(0);
 
   await user.click(screen.getByRole('checkbox', { name: '客户甲 1个项目' }));
-  expect(screen.getByText('当前筛选 1 / 全部 3 个项目')).toBeInTheDocument();
-  expect((screen.getByLabelText('经营复盘草稿') as HTMLTextAreaElement).value).toContain('客户名称：客户甲');
+  expect(screen.getAllByText('当前筛选 1 / 全部 3 个项目')).toHaveLength(2);
+  await user.click(screen.getByRole('tab', { name: '复盘摘要' }));
+  expect(screen.getByText('筛选范围：客户名称：客户甲')).toBeInTheDocument();
+  await user.click(screen.getByRole('tab', { name: '项目问题清单' }));
   await user.click(screen.getByRole('button', { name: '清除全部筛选' }));
 
   await user.click(screen.getByRole('checkbox', { name: '销售甲 1个项目' }));
 
-  expect(screen.getByText('当前筛选 1 / 全部 3 个项目')).toBeInTheDocument();
-  expect(within(projectCountMetric).getByText('1')).toBeInTheDocument();
-  expect(within(amountMetric).getByText('100')).toBeInTheDocument();
-  const report = (screen.getByLabelText('经营复盘草稿') as HTMLTextAreaElement).value;
-  expect(report).toContain('销售经理：销售甲');
-  expect(report).not.toContain('甲方超期商机');
-  expect(report).toContain('跟进超期');
-  expect(report).not.toContain('乙方正常商机');
+  expect(screen.getAllByText('当前筛选 1 / 全部 3 个项目')).toHaveLength(2);
+  expect(screen.getByText('甲方超期商机')).toBeInTheDocument();
+  expect(screen.queryByText('乙方正常商机')).not.toBeInTheDocument();
+  await user.click(screen.getByRole('tab', { name: '分析总览' }));
+  const filteredOverview = screen.getByRole('region', { name: '分析总览指标' });
+  expect(within(within(filteredOverview).getByText('项目总数').closest('article')!).getByText('1')).toBeInTheDocument();
+  expect(within(within(filteredOverview).getByText('储备金额').closest('article')!).getByText('100')).toBeInTheDocument();
+  await user.click(screen.getByRole('tab', { name: '复盘摘要' }));
+  expect(screen.getByText('筛选范围：销售经理：销售甲')).toBeInTheDocument();
 });
 
 it('isolates review decisions by confirmed data source instead of file name', async () => {
@@ -376,6 +386,7 @@ it('isolates review decisions by confirmed data source instead of file name', as
   await user.upload(input, new File(['first'], '同名项目台账.xlsx'));
   await setSource('客户甲 CRM账套');
   await analyze();
+  await user.click(screen.getByRole('tab', { name: '项目问题清单' }));
   const firstReview = screen.getAllByLabelText('SAME-1 审查状态')[0];
   await user.selectOptions(firstReview, '已忽略');
   expect(firstReview).toHaveValue('已忽略');
@@ -383,17 +394,20 @@ it('isolates review decisions by confirmed data source instead of file name', as
   await user.upload(input, new File(['second'], '同名项目台账.xlsx'));
   await setSource('客户乙 CRM账套');
   await analyze();
+  await user.click(screen.getByRole('tab', { name: '项目问题清单' }));
   expect(screen.getAllByLabelText('SAME-1 审查状态')[0]).toHaveValue('待复核');
 
   await setSource('客户甲 CRM账套');
-  expect(screen.queryByRole('heading', { name: '数据质量待复核' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('tab', { name: '分析总览' })).not.toBeInTheDocument();
   expect(screen.getByRole('heading', { name: '有 1 项需要确认' })).toBeInTheDocument();
   await analyze();
+  await user.click(screen.getByRole('tab', { name: '项目问题清单' }));
   expect(screen.getAllByLabelText('SAME-1 审查状态')[0]).toHaveValue('已忽略');
 
   await user.upload(input, new File(['renamed'], '已改名台账.xlsx'));
   await setSource('客户甲 CRM账套');
   await analyze();
+  await user.click(screen.getByRole('tab', { name: '项目问题清单' }));
   expect(screen.getAllByLabelText('SAME-1 审查状态')[0]).toHaveValue('已忽略');
 });
 

@@ -1,15 +1,17 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Copy, Download, FileSpreadsheet, GitFork, Mail, ShieldCheck, Upload } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import './review.css';
 import './filters.css';
 import { AnalysisFilters } from './components/AnalysisFilters';
-import { AnalysisResults } from './components/AnalysisResults';
+import { AnalysisWorkspace } from './components/AnalysisWorkspace';
 import { ImportWizard, type ImportReadyPayload } from './components/ImportWizard';
 import { buildAnalysis, evaluateRulePack, projectAnalysis, type AnalysisResult, type CanonicalFieldKey } from './domain/analyze';
 import { describeFilters, EMPTY_FILTERS, filterProjectKeys, type FilterState } from './domain/filters';
-import { createReviewReport, formatLocalDate } from './domain/report';
+import { createProjectDetailWorkbook } from './domain/projectDetailExport';
+import { createReviewReport, createReviewSummary, formatLocalDate } from './domain/report';
 import { loadReviewRecords, reconcileReviewRecords, saveReviewRecords, updateReviewRecord, type ReviewRecordMap, type ReviewStatus } from './domain/review';
-import { findingKind, manualReviewKeys } from './domain/workbench';
+import { buildProjectWorkbenchRows, manualReviewKeys } from './domain/workbench';
 import { inspectSheet, inspectWorkbook, type WorkbookInspection } from './lib/workbook';
 
 const suggestedSourceNamespace = (fileName: string) => fileName.replace(/\.xlsx$/i, '').trim();
@@ -23,7 +25,6 @@ export default function App() {
   const [importReady, setImportReady] = useState<ImportReadyPayload | null>(null);
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
   const [filters, setFilters] = useState<FilterState>(EMPTY_FILTERS);
-  const [currentReport, setCurrentReport] = useState('');
   const [error, setError] = useState('');
   const [reviewRecords, setReviewRecords] = useState<ReviewRecordMap>(() => loadReviewRecords(window.localStorage));
   const [storageError, setStorageError] = useState('');
@@ -38,31 +39,16 @@ export default function App() {
     () => analysis ? projectAnalysis(analysis, selectedKeys) : null,
     [analysis, selectedKeys]
   );
-  const reviewDisplayAnalysis = useMemo(() => {
-    if (!visibleAnalysis) return null;
-    const displayFindings = (findings: AnalysisResult['findings']) => findings.map((finding) =>
-      findingKind(finding) === 'manual' ? finding : { ...finding, level: 'info' as const }
-    );
-    return {
-      ...visibleAnalysis,
-      findings: displayFindings(visibleAnalysis.findings),
-      results: Object.fromEntries(Object.entries(visibleAnalysis.results).map(([category, findings]) => [category, displayFindings(findings)])) as AnalysisResult['results']
-    };
-  }, [visibleAnalysis]);
   const filterScope = useMemo(() => describeFilters(filters), [filters]);
-  const generatedCurrentReport = useMemo(
+  const currentReport = useMemo(
     () => visibleAnalysis ? createReviewReport(visibleAnalysis, reviewRecords, new Date(), filterScope) : '',
     [visibleAnalysis, reviewRecords, filterScope]
   );
-  const allReport = useMemo(
-    () => analysis ? createReviewReport(analysis, reviewRecords, new Date()) : '',
-    [analysis, reviewRecords]
+  const currentSummary = useMemo(
+    () => visibleAnalysis ? createReviewSummary(visibleAnalysis, reviewRecords, filterScope) : null,
+    [visibleAnalysis, reviewRecords, filterScope]
   );
   const confirmedSourceNamespace = sourceNamespace.trim();
-
-  useEffect(() => {
-    setCurrentReport(generatedCurrentReport);
-  }, [generatedCurrentReport]);
 
   function persistReviews(records: ReviewRecordMap) {
     try {
@@ -80,7 +66,6 @@ export default function App() {
       setAnalysis(null);
       setFilters(EMPTY_FILTERS);
       setImportReady(null);
-      setCurrentReport('');
       setSourceNamespace('');
       const next = await inspectWorkbook(file);
       setImportRevision((current) => current + 1);
@@ -115,14 +100,12 @@ export default function App() {
     setFilters(EMPTY_FILTERS);
     setImportReady(payload);
     setReviewRecords(nextReviews);
-    setCurrentReport(createReviewReport(result, nextReviews, now));
   }
 
   function clearImportedAnalysis() {
     setImportReady(null);
     setAnalysis(null);
     setFilters(EMPTY_FILTERS);
-    setCurrentReport('');
   }
 
   function changeSourceNamespace(value: string) {
@@ -143,13 +126,11 @@ export default function App() {
     persistReviews(next);
   }
 
-  function downloadReport(report: string, suffix: '当前筛选' | '全部') {
-    if (!report.trim()) return;
-    const blob = new Blob([report], { type: 'text/markdown;charset=utf-8' });
+  function downloadBlob(blob: Blob, fileName: string) {
     const link = document.createElement('a');
     const objectUrl = URL.createObjectURL(blob);
     link.href = objectUrl;
-    link.download = `储备项目经营复盘-${formatLocalDate(new Date())}-${suffix}.md`;
+    link.download = fileName;
     document.body.append(link);
     try {
       link.click();
@@ -157,6 +138,26 @@ export default function App() {
       link.remove();
       window.setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
     }
+  }
+
+  function downloadCurrentReport() {
+    if (!currentReport.trim()) return;
+    downloadBlob(
+      new Blob([currentReport], { type: 'text/markdown;charset=utf-8' }),
+      `储备项目经营复盘-${formatLocalDate(new Date())}-当前筛选.md`
+    );
+  }
+
+  function downloadProjectDetails(selection: Set<string>) {
+    if (!visibleAnalysis) return;
+    const scope = selection.size > 0 ? projectAnalysis(visibleAnalysis, selection) : visibleAnalysis;
+    const workbook = createProjectDetailWorkbook(buildProjectWorkbenchRows(scope), reviewRecords);
+    const data = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+    const suffix = selection.size > 0 ? `所选${selection.size}个项目` : '当前筛选';
+    downloadBlob(
+      new Blob([data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }),
+      `CRM项目分析明细-${formatLocalDate(new Date())}-${suffix}.xlsx`
+    );
   }
 
   async function copyFeedbackEmail() {
@@ -176,7 +177,7 @@ export default function App() {
         {fileName && <label className="source-namespace"><span>数据来源标识（企业/账套）</span><input required aria-label="数据来源标识（企业/账套）" aria-invalid={!confirmedSourceNamespace} value={sourceNamespace} onChange={(event) => changeSourceNamespace(event.target.value)} /><small>同一企业或 CRM 账套每次重导请保持一致；不同企业或账套必须使用不同标识。</small></label>}
         {error && <p className="error">{error}</p>}
       </div>
-      {inspection && <div className="side-section"><p className="side-label">工作表</p><select aria-label="工作表" value={sheetName} onChange={(event) => { setSheetName(event.target.value); setImportReady(null); setAnalysis(null); setFilters(EMPTY_FILTERS); setCurrentReport(''); }}>{inspection.sheetNames.map((name) => <option key={name}>{name}</option>)}</select>
+      {inspection && <div className="side-section"><p className="side-label">工作表</p><select aria-label="工作表" value={sheetName} onChange={(event) => { setSheetName(event.target.value); setImportReady(null); setAnalysis(null); setFilters(EMPTY_FILTERS); }}>{inspection.sheetNames.map((name) => <option key={name}>{name}</option>)}</select>
         <p className="side-label threshold-title">规则阈值</p>
         <Threshold label="跟进维护周期" value={30} suffix="天" />
         <Threshold label="重点项目金额" value={1000} suffix="万元" />
@@ -189,11 +190,19 @@ export default function App() {
       {!inspection && <section className="empty import-guide"><FileSpreadsheet size={36} /><h2>上传 CRM 储备项目表</h2><p>支持未加密的 .xlsx 文件，可在导入向导中确认表头、字段关系和业务口径。</p><a className="sample-download" href="/CRM历史项目表-脱敏适配样表.xlsx" download><Download size={15} /> 下载脱敏示例表</a></section>}
       {sheetInspection && !confirmedSourceNamespace && <section className="notice" role="alert"><h2>需要数据来源标识</h2><p>请填写数据来源标识后继续导入。</p></section>}
       {sheetInspection && confirmedSourceNamespace && <ImportWizard key={`${importRevision}:${fileName}:${sheetName}:${sourceNamespace}`} inspection={sheetInspection} sourceNamespace={confirmedSourceNamespace} onReady={startAnalysis} onConfigurationChange={clearImportedAnalysis} />}
-      {analysis && visibleAnalysis && <>
+      {analysis && visibleAnalysis && currentSummary && <>
         {storageError && <section className="notice storage-notice" role="alert"><h2>自动保存失败</h2><p>{storageError}</p><button type="button" className="secondary" onClick={() => persistReviews(reviewRecords)}>重试保存</button></section>}
-        <AnalysisFilters analysis={analysis} filters={filters} reviews={reviewRecords} selectedCount={selectedKeys.size} totalCount={analysis.rows.length} onChange={setFilters} />
-        {reviewDisplayAnalysis && <AnalysisResults analysis={reviewDisplayAnalysis} reviews={reviewRecords} onChangeReview={changeReview} />}
-        <section className="report-card"><div className="table-heading"><div><h2>经营复盘草稿</h2><p>当前 {visibleAnalysis.rows.length} / 全部 {analysis.rows.length} 个项目</p><p>筛选范围：{filterScope.length > 0 ? filterScope.join('；').replace(/[\r\n\t]+/g, ' ').replace(/\|/g, '/') : '全部项目'}</p></div><div><button className="secondary" onClick={() => downloadReport(currentReport, '当前筛选')} disabled={!currentReport.trim()}><Download size={15} /> 导出当前筛选结果</button> <button className="secondary" onClick={() => downloadReport(allReport, '全部')} disabled={!allReport.trim()}><Download size={15} /> 导出全部结果</button></div></div><textarea value={currentReport} onChange={(event) => setCurrentReport(event.target.value)} aria-label="经营复盘草稿" /></section>
+        <AnalysisWorkspace
+          analysis={visibleAnalysis}
+          fullCount={analysis.rows.length}
+          filters={filters}
+          reviews={reviewRecords}
+          filterControls={<AnalysisFilters analysis={analysis} filters={filters} reviews={reviewRecords} selectedCount={selectedKeys.size} totalCount={analysis.rows.length} onChange={setFilters} />}
+          summary={currentSummary}
+          onChangeReview={changeReview}
+          onDownloadMarkdown={downloadCurrentReport}
+          onDownloadExcel={downloadProjectDetails}
+        />
       </>}
       <footer className="product-footer">
         <span>反馈建议</span>
