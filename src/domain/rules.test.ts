@@ -382,6 +382,26 @@ describe('confirmed To B rule pack', () => {
     expect(new Set(renamedSourceRelationKeys)).toEqual(new Set(relationKeys));
   });
 
+  it('keeps separate stable similar-name pairs when normalized names repeat across business records', () => {
+    const rows = [
+      makeProject({ sourceKey: 'same-name-a', projectId: 'SIM-A', projectName: '华城医院数字化改造项目', salesManager: '销售甲' }),
+      makeProject({ sourceKey: 'same-name-b', projectId: 'SIM-B', projectName: '华城医院数字化改造项目', salesManager: '销售乙' }),
+      makeProject({ sourceKey: 'similar-third', projectId: 'SIM-C', projectName: '华城医院数字化改造工程', salesManager: '销售丙' })
+    ];
+    const similarFindings = evaluateRulePack(rows, today)
+      .filter((item) => item.ruleId === 'similar-name');
+    const renamedSourceFindings = evaluateRulePack(rows.map((row, index) => ({
+      ...row,
+      sourceKey: `replacement-import:row-${index + 500}`
+    })), today)
+      .filter((item) => item.ruleId === 'similar-name');
+
+    expect(similarFindings).toHaveLength(4);
+    expect(new Set(similarFindings.map((item) => item.relationKey)).size).toBe(2);
+    expect(new Set(renamedSourceFindings.map((item) => item.relationKey)))
+      .toEqual(new Set(similarFindings.map((item) => item.relationKey)));
+  });
+
   it('reports blank mapped identity and ownership fields with specific Chinese names', () => {
     const findings = evaluateRulePack([
       makeProject({ projectId: '', projectName: ' ', customerName: '', department: '', salesManager: '' })

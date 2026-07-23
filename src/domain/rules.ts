@@ -317,6 +317,22 @@ function businessRelationKey(ruleId: string, parts: string[]) {
   return `${ruleId}:${parts.join('\u0000')}`;
 }
 
+function stableProjectIdentity(row: ProjectRow) {
+  const projectId = normalizedProjectId(row.projectId);
+  if (projectId) return `project-id:${projectId}`;
+  return businessRelationKey('project-fields', [
+    normalizedCustomer(row.customerName),
+    normalizeProjectName(row.projectName),
+    normalizedCustomer(row.salesManager),
+    normalizedCustomer(row.department),
+    normalizedCustomer(row.industry),
+    normalizedCustomer(row.region),
+    normalizedCustomer(row.projectType),
+    normalizedCustomer(row.projectLevel),
+    row.createdAt?.trim() ?? ''
+  ]);
+}
+
 function evaluateDuplicates(rows: ProjectRow[]): Finding[] {
   const results: Finding[] = [];
   const byId = new Map<string, ProjectRow[]>();
@@ -381,10 +397,10 @@ function evaluateDuplicates(rows: ProjectRow[]): Finding[] {
       const rightName = normalizeProjectName(right.projectName);
       if (distinctProjectMarkers(left.projectName, right.projectName)) continue;
       if (!conservativeSimilarity(leftName, rightName)) continue;
-      const relationKey = businessRelationKey('similar-name', [
-        `${normalizedCustomer(left.customerName)}\u0001${leftName}`,
-        `${normalizedCustomer(right.customerName)}\u0001${rightName}`
-      ].sort());
+      const relationKey = businessRelationKey(
+        'similar-name',
+        [stableProjectIdentity(left), stableProjectIdentity(right)].sort()
+      );
       results.push({ ...finding(left, 'similar-name', '疑似重复与撞单', '名称相似待核验', `与“${right.projectName}”名称相似，仅作人工核验提示`, 'info'), relationKey });
       results.push({ ...finding(right, 'similar-name', '疑似重复与撞单', '名称相似待核验', `与“${left.projectName}”名称相似，仅作人工核验提示`, 'info'), relationKey });
     }
