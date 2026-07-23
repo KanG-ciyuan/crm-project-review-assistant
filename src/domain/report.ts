@@ -46,7 +46,7 @@ function renderTopBreakdown(analysis: AnalysisResult): string[] {
     ...analysis.byDepartment.slice(0, 5).map((item) => `部门：${item.name}（${item.projectCount} 个，${formatAmount(item.amountWan)} 万元）`),
     ...analysis.bySalesManager.slice(0, 5).map((item) => `负责人：${item.name}（${item.projectCount} 个，${formatAmount(item.amountWan)} 万元）`)
   ];
-  return combined.length > 0 ? combined : ['暂无部门或负责人数据。'];
+  return combined.length > 0 ? combined.slice(0, 5) : ['暂无部门或负责人数据。'];
 }
 
 export function createReviewReport(analysis: AnalysisResult, reviews: ReviewRecordMap, today: Date, filterScope: string[] = []): string {

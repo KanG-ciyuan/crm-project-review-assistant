@@ -65,6 +65,8 @@ describe('createReviewReport', () => {
 
     expect(report).not.toContain('不应泄漏项目');
     expect(report.match(/^\d+\. /gm)?.length ?? 0).toBeLessThanOrEqual(6);
+    const peopleSection = report.split('## 三、重点部门与负责人')[1].split('## 四、规则分布摘要')[0];
+    expect(peopleSection.match(/^- /gm)?.length ?? 0).toBeLessThanOrEqual(5);
   });
 
   it('does not count information-only findings as review work', () => {
