@@ -16,6 +16,7 @@ describe('filter workbench styles', () => {
     expect(css).toMatch(/\.filter-menu summary:focus-visible/);
     expect(css).toMatch(/\.filter-search:focus-within/);
     expect(css).toMatch(/\.filter-chip button:focus-visible/);
+    expect(css.match(/outline:\s*3px solid #0c6668/g)).toHaveLength(3);
   });
 
   it('contains open menus in the responsive project tab at 760px', () => {

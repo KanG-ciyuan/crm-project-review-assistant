@@ -38,7 +38,7 @@
 
 .filter-search:focus-within {
   border-color: #438887;
-  outline: 3px solid #b7d9d7;
+  outline: 3px solid #0c6668;
   outline-offset: 1px;
 }
 
@@ -99,7 +99,7 @@
 }
 
 .filter-menu summary:focus-visible {
-  outline: 3px solid #63aaa8;
+  outline: 3px solid #0c6668;
   outline-offset: 2px;
 }
 
@@ -197,7 +197,7 @@
 .filter-clear:focus-visible,
 .filter-menu-actions button:focus-visible,
 .only-option:focus-visible {
-  outline: 3px solid #63aaa8;
+  outline: 3px solid #0c6668;
   outline-offset: 1px;
 }
 

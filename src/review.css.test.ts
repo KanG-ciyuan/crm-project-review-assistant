@@ -1,12 +1,46 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 // @ts-expect-error Node types are intentionally not part of the browser app build.
 import { readFileSync } from 'node:fs';
 
 const reviewCss = readFileSync('src/review.css', 'utf8');
 const globalCss = readFileSync('src/styles.css', 'utf8');
-const allCss = `${globalCss}\n${reviewCss}\n${readFileSync('src/filters.css', 'utf8')}`;
+const filterCss = readFileSync('src/filters.css', 'utf8');
+const allCss = `${reviewCss}\n${filterCss}\n${globalCss}`;
+
+function mountRealStyles() {
+  const style = document.createElement('style');
+  style.dataset.realStyles = '';
+  style.textContent = allCss;
+  document.head.append(style);
+  return style;
+}
+
+afterEach(() => {
+  document.querySelectorAll('style[data-real-styles]').forEach((style) => style.remove());
+  document.body.replaceChildren();
+});
 
 describe('analysis workbench layout styles', () => {
+  it('keeps only the page header flex in the real stylesheet order', () => {
+    mountRealStyles();
+    document.body.innerHTML = `<main class="content">
+      <header id="page-header"><h1>页面标题</h1></header>
+      <section class="review-summary"><header id="summary-header"><h2>复盘摘要</h2></header></section>
+    </main>`;
+
+    expect(getComputedStyle(document.querySelector('#page-header')!).display).toBe('flex');
+    expect(getComputedStyle(document.querySelector('#summary-header')!).display).toBe('block');
+
+  });
+
+  it('computes the dark teal focus token used by keyboard outlines', () => {
+    mountRealStyles();
+
+    expect(getComputedStyle(document.documentElement).getPropertyValue('--focus').trim()).toBe('#0c6668');
+    expect(globalCss).toMatch(/button:focus-visible,[\s\S]*?outline:\s*3px solid var\(--focus\)/);
+
+  });
+
   it('gives the workbench tabs a stable accessible selected state', () => {
     expect(reviewCss).toMatch(/\.workbench-tabs\s*\{[\s\S]*?min-height:\s*44px/);
     expect(reviewCss).toMatch(/\.workbench-tabs\s+button\s*\{[\s\S]*?height:\s*44px/);
