@@ -309,8 +309,12 @@ function conservativeSimilarity(left: string, right: string) {
   return (2 * overlap) / (leftPairs.length + rightPairs.length) >= 0.75;
 }
 
-function duplicateRelationKey(ruleId: string, rows: ProjectRow[]) {
-  return `${ruleId}:${rows.map(projectKey).sort().join('\u0000')}`;
+function normalizedProjectId(value: string) {
+  return value.normalize('NFKC').toLocaleLowerCase('zh-CN').trim();
+}
+
+function businessRelationKey(ruleId: string, parts: string[]) {
+  return `${ruleId}:${parts.join('\u0000')}`;
 }
 
 function evaluateDuplicates(rows: ProjectRow[]): Finding[] {
@@ -330,7 +334,7 @@ function evaluateDuplicates(rows: ProjectRow[]): Finding[] {
 
   for (const group of byId.values()) {
     if (group.length < 2) continue;
-    const relationKey = duplicateRelationKey('duplicate-record', group);
+    const relationKey = businessRelationKey('duplicate-record', [normalizedProjectId(group[0].projectId)]);
     results.push(...group.map((row) => ({
       ...finding(row, 'duplicate-record', '数据质量待复核', '重复记录待核实', '相同项目编码出现多条记录，需检查 CRM 导出或数据重复', 'review'),
       relationKey
@@ -345,16 +349,20 @@ function evaluateDuplicates(rows: ProjectRow[]): Finding[] {
         const right = group[rightIndex];
         if (!left.projectId || !right.projectId || left.projectId === right.projectId) continue;
         if (left.salesManager && left.salesManager === right.salesManager) {
-          const relationKey = duplicateRelationKey(
+          const relationKey = businessRelationKey(
             'duplicate-project',
-            group.filter((row) => row.salesManager === left.salesManager)
+            [
+              normalizedCustomer(left.customerName),
+              normalizeProjectName(left.projectName),
+              normalizedCustomer(left.salesManager)
+            ]
           );
           results.push({ ...finding(left, 'duplicate-project', '疑似重复与撞单', '疑似重复立项', '同一销售在同一客户下存在规范化后同名的不同项目编码', 'review'), relationKey });
           results.push({ ...finding(right, 'duplicate-project', '疑似重复与撞单', '疑似重复立项', '同一销售在同一客户下存在规范化后同名的不同项目编码', 'review'), relationKey });
         } else if (left.salesManager && right.salesManager && left.salesManager !== right.salesManager) {
-          const relationKey = duplicateRelationKey(
+          const relationKey = businessRelationKey(
             'cross-seller-collision',
-            group.filter((row) => row.salesManager)
+            [normalizedCustomer(left.customerName), normalizeProjectName(left.projectName)]
           );
           results.push({ ...finding(left, 'cross-seller-collision', '疑似重复与撞单', '疑似撞单待核验', '同一客户的同名项目由不同销售负责，需核验归属', 'review'), relationKey });
           results.push({ ...finding(right, 'cross-seller-collision', '疑似重复与撞单', '疑似撞单待核验', '同一客户的同名项目由不同销售负责，需核验归属', 'review'), relationKey });
@@ -373,7 +381,10 @@ function evaluateDuplicates(rows: ProjectRow[]): Finding[] {
       const rightName = normalizeProjectName(right.projectName);
       if (distinctProjectMarkers(left.projectName, right.projectName)) continue;
       if (!conservativeSimilarity(leftName, rightName)) continue;
-      const relationKey = duplicateRelationKey('similar-name', [left, right]);
+      const relationKey = businessRelationKey('similar-name', [
+        `${normalizedCustomer(left.customerName)}\u0001${leftName}`,
+        `${normalizedCustomer(right.customerName)}\u0001${rightName}`
+      ].sort());
       results.push({ ...finding(left, 'similar-name', '疑似重复与撞单', '名称相似待核验', `与“${right.projectName}”名称相似，仅作人工核验提示`, 'info'), relationKey });
       results.push({ ...finding(right, 'similar-name', '疑似重复与撞单', '名称相似待核验', `与“${left.projectName}”名称相似，仅作人工核验提示`, 'info'), relationKey });
     }

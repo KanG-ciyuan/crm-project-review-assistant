@@ -124,9 +124,15 @@ describe('confirmed To B rule pack', () => {
     ];
     const findings = evaluateRulePack(rows, today);
     const rowKeysFor = (ruleId: string) => findings.filter((item) => item.ruleId === ruleId).map((item) => item.rowKey).sort();
+    const relationKeysFor = (ruleId: string) => new Set(findings
+      .filter((item) => item.ruleId === ruleId)
+      .map((item) => item.relationKey));
 
     expect(rowKeysFor('duplicate-project')).toEqual(['mixed-a', 'mixed-b']);
     expect(rowKeysFor('cross-seller-collision')).toEqual(['mixed-a', 'mixed-b', 'mixed-c']);
+    expect(relationKeysFor('duplicate-project').size).toBe(1);
+    expect(relationKeysFor('cross-seller-collision').size).toBe(1);
+    expect([...relationKeysFor('duplicate-project')][0]).not.toBe([...relationKeysFor('cross-seller-collision')][0]);
   });
 
   it('does not infer duplicate creation or collision from records sharing one project code', () => {
@@ -301,13 +307,16 @@ describe('confirmed To B rule pack', () => {
     const relationKeys = evaluateRulePack(rows, today)
       .filter((item) => item.ruleId === 'duplicate-record')
       .map((item) => item.relationKey);
-    const reversedRelationKeys = evaluateRulePack([...rows].reverse(), today)
+    const renamedSourceRelationKeys = evaluateRulePack(rows.map((row, index) => ({
+      ...row,
+      sourceKey: `second-import:sheet-2:row-${index + 40}`
+    })), today)
       .filter((item) => item.ruleId === 'duplicate-record')
       .map((item) => item.relationKey);
 
     expect(relationKeys).toHaveLength(3);
-    expect(new Set(relationKeys)).toEqual(new Set(['duplicate-record:record-a\u0000record-b\u0000record-c']));
-    expect(new Set(reversedRelationKeys)).toEqual(new Set(relationKeys));
+    expect(new Set(relationKeys)).toEqual(new Set(['duplicate-record:dup-1']));
+    expect(new Set(renamedSourceRelationKeys)).toEqual(new Set(relationKeys));
   });
 
   it('links both ends of an exact same-seller duplicate-project pair with a stable typed key', () => {
@@ -318,15 +327,17 @@ describe('confirmed To B rule pack', () => {
     const relationKeys = evaluateRulePack(rows, today)
       .filter((item) => item.ruleId === 'duplicate-project')
       .map((item) => item.relationKey);
-    const reversedRelationKeys = evaluateRulePack([...rows].reverse(), today)
+    const renamedSourceRelationKeys = evaluateRulePack(rows.map((row, index) => ({
+      ...row,
+      sourceKey: `crm-export-v2:${index + 100}`
+    })), today)
       .filter((item) => item.ruleId === 'duplicate-project')
       .map((item) => item.relationKey);
 
-    expect(relationKeys).toEqual([
-      'duplicate-project:project-a\u0000project-b',
-      'duplicate-project:project-a\u0000project-b'
-    ]);
-    expect(new Set(reversedRelationKeys)).toEqual(new Set(relationKeys));
+    expect(relationKeys).toHaveLength(2);
+    expect(new Set(relationKeys).size).toBe(1);
+    expect(relationKeys[0]).toMatch(/^duplicate-project:/);
+    expect(new Set(renamedSourceRelationKeys)).toEqual(new Set(relationKeys));
   });
 
   it('links both ends of an exact cross-seller collision pair without merging rule types', () => {
@@ -337,12 +348,17 @@ describe('confirmed To B rule pack', () => {
     const relationKeys = evaluateRulePack(rows, today)
       .filter((item) => item.ruleId === 'cross-seller-collision')
       .map((item) => item.relationKey);
+    const renamedSourceRelationKeys = evaluateRulePack(rows.map((row, index) => ({
+      ...row,
+      sourceKey: `another-workbook:row-${index + 8}`
+    })), today)
+      .filter((item) => item.ruleId === 'cross-seller-collision')
+      .map((item) => item.relationKey);
 
-    expect(relationKeys).toEqual([
-      'cross-seller-collision:collision-a\u0000collision-b',
-      'cross-seller-collision:collision-a\u0000collision-b'
-    ]);
-    expect(relationKeys.every((key) => key !== 'duplicate-project:collision-a\u0000collision-b')).toBe(true);
+    expect(relationKeys).toHaveLength(2);
+    expect(new Set(relationKeys).size).toBe(1);
+    expect(relationKeys[0]).toMatch(/^cross-seller-collision:/);
+    expect(new Set(renamedSourceRelationKeys)).toEqual(new Set(relationKeys));
   });
 
   it('prefixes existing similar-name pair relationships with their rule type', () => {
@@ -353,11 +369,17 @@ describe('confirmed To B rule pack', () => {
     const relationKeys = evaluateRulePack(rows, today)
       .filter((item) => item.ruleId === 'similar-name')
       .map((item) => item.relationKey);
+    const renamedSourceRelationKeys = evaluateRulePack(rows.map((row, index) => ({
+      ...row,
+      sourceKey: `renumbered-source:${index + 200}`
+    })), today)
+      .filter((item) => item.ruleId === 'similar-name')
+      .map((item) => item.relationKey);
 
-    expect(relationKeys).toEqual([
-      'similar-name:similar-a\u0000similar-b',
-      'similar-name:similar-a\u0000similar-b'
-    ]);
+    expect(relationKeys).toHaveLength(2);
+    expect(new Set(relationKeys).size).toBe(1);
+    expect(relationKeys[0]).toMatch(/^similar-name:/);
+    expect(new Set(renamedSourceRelationKeys)).toEqual(new Set(relationKeys));
   });
 
   it('reports blank mapped identity and ownership fields with specific Chinese names', () => {
