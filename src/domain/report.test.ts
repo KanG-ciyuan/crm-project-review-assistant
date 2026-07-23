@@ -17,21 +17,22 @@ const reviews: ReviewRecordMap = {
 };
 
 describe('createReviewReport', () => {
-  it('includes the fixed disclaimer and five result sections', () => {
+  it('renders a fixed management summary structure without project detail', () => {
     const report = createReviewReport(analysis, {}, reportDate);
-    expect(report).toContain('金额、日期、项目状态及业务结论须由业务人员确认');
-    for (const heading of ['数据质量待复核', '维护超期待整改', '疑似重复与撞单', '重点项目复盘', '经营结构分析']) {
-      expect(report).toContain(`## ${heading}`);
-    }
-    expect(report).toContain('P-2026-024');
-    expect(report).toContain('经营观察');
+    expect(report).toMatch(/## 一、总体结论[\s\S]*## 二、优先关注事项[\s\S]*## 三、重点部门与负责人[\s\S]*## 四、规则分布摘要[\s\S]*## 五、建议行动/);
+    expect(report).not.toContain('P-2026-024');
+    expect(report).not.toContain('远景综合管廊项目');
+    expect(report).not.toContain('待整改');
+    expect(report).not.toContain('已通知');
+    expect(report).not.toContain('整改截止');
   });
 
-  it('adds grouped human-review progress by project row key', () => {
+  it('includes only bounded review statuses and regenerates when reviews change', () => {
     const report = createReviewReport(analysis, reviews, reportDate);
-    expect(report).toContain('## 审查处理进度');
-    expect(report).toContain('已通知销售修正金额。');
-    expect(report).toContain('金额、日期、项目状态及业务结论须由业务人员确认');
+    expect(report).toContain('确认数据错误');
+    expect(report).not.toContain('已通知销售修正金额');
+    expect(report).not.toContain('## 审查处理进度');
+    expect(createReviewReport(analysis, {}, reportDate)).not.toBe(report);
   });
 
   it('writes a markdown-safe active filter scope immediately after the generated date', () => {
@@ -44,7 +45,7 @@ describe('createReviewReport', () => {
     expect(report).not.toContain('筛选范围：部门：华东\n一部');
   });
 
-  it('only reports rows and actionable review progress from the projected analysis', () => {
+  it('caps conclusions, issue categories, people scope, and actions', () => {
     const hidden = makeProject({ sourceKey: 'row-hidden', projectId: 'P-HIDDEN', projectName: '不应泄漏项目' });
     const visibleAction: Finding = {
       ...findings[0], rowKey: row.sourceKey, projectId: row.projectId, projectName: row.projectName,
@@ -62,24 +63,19 @@ describe('createReviewReport', () => {
 
     const report = createReviewReport(projected, mixedReviews, reportDate, ['部门：华东部']);
 
-    expect(report).toContain('远景综合管廊项目');
-    expect(report).not.toContain(hidden.projectName);
-    expect(report).not.toContain('仅属于隐藏项目的证据');
-    expect(report).not.toContain('隐藏项目备注');
-    expect(report).toContain('## 经营结构分析');
-    expect(report).not.toContain('重点风险项目');
-    expect(report).not.toContain('低概率重点项目');
+    expect(report).not.toContain('不应泄漏项目');
+    expect(report.match(/^\d+\. /gm)?.length ?? 0).toBeLessThanOrEqual(6);
   });
 
-  it('does not count information-only findings as pending review work', () => {
+  it('does not count information-only findings as review work', () => {
     const infoOnly = buildAnalysis([row], [findings[1]], reportDate);
     const report = createReviewReport(infoOnly, reviews, reportDate);
 
-    expect(report).toContain('### 待复核项目\n\n本期无项目。');
-    expect(report).toContain('### 已确认数据错误项目\n\n本期无项目。');
+    expect(report).toContain('待复核 0 个');
+    expect(report).toContain('确认数据错误 0 个');
   });
 
-  it('exports every finding when one category contains more than eight items', () => {
+  it('does not grow linearly with project count', () => {
     const rows = Array.from({ length: 12 }, (_, index) => makeProject({
       sourceKey: `row-${index + 1}`,
       projectId: `P-${index + 1}`,
@@ -102,9 +98,8 @@ describe('createReviewReport', () => {
 
     const report = createReviewReport(buildAnalysis(rows, manyFindings, reportDate), {}, reportDate);
 
-    expect(report.match(/完整性问题\d+/g)).toHaveLength(24);
-    expect(report).toContain('完整导出项目12');
-    expect(report).toContain('第12条证据');
+    expect(report).not.toContain('完整导出项目12');
+    expect(report.length).toBeLessThan(3000);
   });
 
   it('keeps untrusted report fields inline and escapes markdown and html structures', () => {
@@ -134,15 +129,14 @@ describe('createReviewReport', () => {
       ['部门：华东\n## 范围章节 | <script>scope()</script>']
     );
 
-    expect(report.match(/^## /gm)).toHaveLength(8);
+    expect(report.match(/^## /gm)).toHaveLength(5);
     expect(report).not.toContain('\n## 伪造章节');
     expect(report).not.toContain('\n## 假章节');
     expect(report).not.toContain('**加粗**');
     expect(report).not.toContain('**伪造**');
     expect(report).not.toContain('<script>');
     expect(report).not.toContain(' | ');
-    expect(report).toContain('&lt;script&gt;alert(1)&lt;/script&gt;');
-    expect(report).toContain('&#42;&#42;加粗&#42;&#42;');
+    expect(report).toContain('&lt;script&gt;scope()&lt;/script&gt;');
     expect(report).toContain('&#124;');
   });
 
