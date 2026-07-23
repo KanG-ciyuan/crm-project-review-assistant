@@ -468,6 +468,26 @@ describe('confirmed To B rule pack', () => {
       .toEqual(new Set(similarFindings.map((item) => item.relationKey)));
   });
 
+  it('preserves raw fallback business fields in stable similar-name record identities', () => {
+    const rows = [
+      makeProject({ sourceKey: 'fallback-plain', projectId: '', projectName: '华城医院数字化改造项目', salesManager: '销售甲' }),
+      makeProject({ sourceKey: 'fallback-spaced', projectId: '', projectName: '华城医院数字化改造项目', salesManager: '销售甲 ' }),
+      makeProject({ sourceKey: 'fallback-third', projectId: '', projectName: '华城医院数字化改造工程', salesManager: '销售乙' })
+    ];
+    const similarFindings = evaluateRulePack(rows, today)
+      .filter((item) => item.ruleId === 'similar-name');
+    const renamedSourceFindings = evaluateRulePack(rows.map((row, index) => ({
+      ...row,
+      sourceKey: `fallback-reimport:row-${index + 900}`
+    })), today)
+      .filter((item) => item.ruleId === 'similar-name');
+
+    expect(similarFindings).toHaveLength(4);
+    expect(new Set(similarFindings.map((item) => item.relationKey)).size).toBe(2);
+    expect(new Set(renamedSourceFindings.map((item) => item.relationKey)))
+      .toEqual(new Set(similarFindings.map((item) => item.relationKey)));
+  });
+
   it('reports blank mapped identity and ownership fields with specific Chinese names', () => {
     const findings = evaluateRulePack([
       makeProject({ projectId: '', projectName: ' ', customerName: '', department: '', salesManager: '' })

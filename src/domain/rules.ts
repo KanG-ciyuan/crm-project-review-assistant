@@ -315,17 +315,17 @@ function businessRelationKey(ruleId: string, parts: string[]) {
 
 function stableProjectIdentity(row: ProjectRow) {
   if (row.projectId) return `project-id:${row.projectId}`;
-  return businessRelationKey('project-fields', [
-    row.customerName.trim(),
-    row.projectName.trim(),
-    row.salesManager.trim(),
-    row.department.trim(),
-    row.industry.trim(),
-    row.region.trim(),
-    row.projectType.trim(),
-    row.projectLevel.trim(),
-    row.createdAt?.trim() ?? ''
-  ]);
+  return `project-fields:${JSON.stringify([
+    row.customerName,
+    row.projectName,
+    row.salesManager,
+    row.department,
+    row.industry,
+    row.region,
+    row.projectType,
+    row.projectLevel,
+    row.createdAt
+  ])}`;
 }
 
 function evaluateDuplicates(rows: ProjectRow[]): Finding[] {
