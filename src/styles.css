@@ -19,6 +19,7 @@
   --observation: #316b86;
   --observation-soft: #e9f3f8;
   --focus: #0c6668;
+  --focus-on-dark: #63aaa8;
   color: var(--text);
   background: var(--canvas);
   letter-spacing: 0;
@@ -41,6 +42,14 @@ textarea:focus-visible,
 a:focus-visible {
   outline: 3px solid var(--focus);
   outline-offset: 2px;
+}
+
+.sidebar button:focus-visible,
+.sidebar input:focus-visible,
+.sidebar select:focus-visible,
+.sidebar textarea:focus-visible,
+.sidebar a:focus-visible {
+  outline-color: var(--focus-on-dark);
 }
 
 .primary { background: var(--accent); }

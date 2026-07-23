@@ -7,6 +7,25 @@ const globalCss = readFileSync('src/styles.css', 'utf8');
 const filterCss = readFileSync('src/filters.css', 'utf8');
 const allCss = `${reviewCss}\n${filterCss}\n${globalCss}`;
 
+function cssHexVariable(name: string) {
+  return globalCss.match(new RegExp(`--${name}:\\s*(#[0-9a-f]{6})`, 'i'))?.[1] ?? '#000000';
+}
+
+function relativeLuminance(hex: string) {
+  const channels = hex.slice(1).match(/.{2}/g)!.map((channel) => parseInt(channel, 16) / 255);
+  const linear = channels.map((channel) => channel <= 0.04045
+    ? channel / 12.92
+    : ((channel + 0.055) / 1.055) ** 2.4);
+  return (0.2126 * linear[0]) + (0.7152 * linear[1]) + (0.0722 * linear[2]);
+}
+
+function contrastRatio(foreground: string, background: string) {
+  const foregroundLuminance = relativeLuminance(foreground);
+  const backgroundLuminance = relativeLuminance(background);
+  return (Math.max(foregroundLuminance, backgroundLuminance) + 0.05)
+    / (Math.min(foregroundLuminance, backgroundLuminance) + 0.05);
+}
+
 function mountRealStyles() {
   const style = document.createElement('style');
   style.dataset.realStyles = '';
@@ -39,6 +58,19 @@ describe('analysis workbench layout styles', () => {
     expect(getComputedStyle(document.documentElement).getPropertyValue('--focus').trim()).toBe('#0c6668');
     expect(globalCss).toMatch(/button:focus-visible,[\s\S]*?outline:\s*3px solid var\(--focus\)/);
 
+  });
+
+  it('uses contrast-safe focus tokens on light canvas and dark sidebar surfaces', () => {
+    mountRealStyles();
+    const focus = cssHexVariable('focus');
+    const focusOnDark = cssHexVariable('focus-on-dark');
+
+    expect(contrastRatio(focus, '#ffffff')).toBeGreaterThanOrEqual(3);
+    expect(contrastRatio(focus, '#f3f5f5')).toBeGreaterThanOrEqual(3);
+    expect(contrastRatio(focusOnDark, '#0b5052')).toBeGreaterThanOrEqual(3);
+    expect(contrastRatio(focusOnDark, '#104f51')).toBeGreaterThanOrEqual(3);
+    expect(getComputedStyle(document.documentElement).getPropertyValue('--focus-on-dark').trim()).toBe('#63aaa8');
+    expect(globalCss).toMatch(/\.sidebar\s+(?:button|input|select|textarea|a):focus-visible,[\s\S]*?outline-color:\s*var\(--focus-on-dark\)/);
   });
 
   it('gives the workbench tabs a stable accessible selected state', () => {
