@@ -105,14 +105,46 @@ describe('project workbench rows', () => {
     expect(byKey.get('source-a')?.relatedProjects).toEqual([
       {
         rowKey: 'source-b', projectId: 'CRM-B', projectName: '项目乙', customerName: '客户乙',
-        salesManager: '销售乙', relationLabel: '甲行关系'
+        salesManager: '销售乙', relationKey, ruleId: 'similar-name', relationLabel: '甲行关系'
       },
       {
         rowKey: 'source-c', projectId: 'CRM-C', projectName: '项目丙', customerName: '客户丙',
-        salesManager: '销售丙', relationLabel: '甲行关系'
+        salesManager: '销售丙', relationKey, ruleId: 'similar-name', relationLabel: '甲行关系'
       }
     ]);
     expect(byKey.get('source-b')?.relatedProjects.map((project) => project.rowKey)).toEqual(['source-a', 'source-c']);
+  });
+
+  it('keeps distinct relation groups and rules for the same project pair independent of finding order', () => {
+    const first = makeProject({ sourceKey: 'source-a', projectId: 'CRM-A', projectName: '项目甲' });
+    const second = makeProject({ sourceKey: 'source-b', projectId: 'CRM-B', projectName: '项目乙' });
+    const findings: Finding[] = [
+      { ...makeFinding('duplicate-record', 'source-a'), relationKey: 'duplicate-group', label: '重复记录待核实' },
+      { ...makeFinding('duplicate-record', 'source-a'), relationKey: 'duplicate-group', label: '重复记录待核实' },
+      { ...makeFinding('duplicate-record', 'source-b'), relationKey: 'duplicate-group', label: '重复记录待核实' },
+      { ...makeFinding('similar-name', 'source-a'), relationKey: 'similar-group', label: '名称相似待核验' },
+      { ...makeFinding('similar-name', 'source-b'), relationKey: 'similar-group', label: '名称相似待核验' }
+    ];
+    const today = new Date(2026, 6, 21, 12);
+    const relatedForA = (orderedFindings: Finding[]) => buildProjectWorkbenchRows(
+      buildAnalysis([first, second], orderedFindings, today)
+    ).find((row) => row.rowKey === 'source-a')?.relatedProjects;
+
+    const expected = [
+      {
+        rowKey: 'source-b', projectId: 'CRM-B', projectName: '项目乙', customerName: second.customerName,
+        salesManager: second.salesManager, relationKey: 'duplicate-group', ruleId: 'duplicate-record',
+        relationLabel: '重复记录待核实'
+      },
+      {
+        rowKey: 'source-b', projectId: 'CRM-B', projectName: '项目乙', customerName: second.customerName,
+        salesManager: second.salesManager, relationKey: 'similar-group', ruleId: 'similar-name',
+        relationLabel: '名称相似待核验'
+      }
+    ];
+
+    expect(relatedForA(findings)).toEqual(expected);
+    expect(relatedForA([...findings].reverse())).toEqual(expected);
   });
 
   it('derives overdue days from the generated local calendar date only for matching rules and valid past dates', () => {

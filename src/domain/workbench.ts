@@ -30,6 +30,8 @@ export interface RelatedProject {
   projectName: string;
   customerName: string;
   salesManager: string;
+  relationKey: string;
+  ruleId: string;
   relationLabel: string;
 }
 
@@ -85,24 +87,34 @@ export function buildProjectWorkbenchRows(analysis: AnalysisResult): ProjectWork
       : factFindings.length > 0
         ? 1
         : observationFindings.length > 0 ? 2 : 3;
-    const relatedProjects: RelatedProject[] = [];
-    const relatedRowKeys = new Set<string>();
+    const relatedProjectsByIdentity = new Map<string, RelatedProject>();
     for (const finding of findings) {
       if (!finding.relationKey) continue;
       for (const relatedRowKey of relationGroups.get(finding.relationKey) ?? []) {
         const relatedProject = projectsByRow.get(relatedRowKey);
-        if (relatedRowKey === rowKey || relatedRowKeys.has(relatedRowKey) || !relatedProject) continue;
-        relatedRowKeys.add(relatedRowKey);
-        relatedProjects.push({
+        if (relatedRowKey === rowKey || !relatedProject) continue;
+        const identity = `${relatedRowKey}\u0000${finding.relationKey}\u0000${finding.ruleId}`;
+        const candidate: RelatedProject = {
           rowKey: relatedRowKey,
           projectId: relatedProject.projectId,
           projectName: relatedProject.projectName,
           customerName: relatedProject.customerName,
           salesManager: relatedProject.salesManager,
+          relationKey: finding.relationKey,
+          ruleId: finding.ruleId,
           relationLabel: finding.label
-        });
+        };
+        const existing = relatedProjectsByIdentity.get(identity);
+        if (!existing || candidate.relationLabel.localeCompare(existing.relationLabel, 'zh-CN') < 0) {
+          relatedProjectsByIdentity.set(identity, candidate);
+        }
       }
     }
+    const relatedProjects = [...relatedProjectsByIdentity.values()].sort((left, right) =>
+      left.rowKey.localeCompare(right.rowKey, 'zh-CN')
+      || left.relationKey.localeCompare(right.relationKey, 'zh-CN')
+      || left.ruleId.localeCompare(right.ruleId, 'zh-CN')
+    );
     return {
       rowKey,
       project,
