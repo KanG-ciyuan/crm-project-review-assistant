@@ -22,6 +22,7 @@ export interface FilterState {
   regions: string[];
   projectTypes: string[];
   projectLevels: string[];
+  manualReviewOnly: boolean;
   query: string;
   customValues: Record<string, string[]>;
 }
@@ -44,6 +45,7 @@ export const EMPTY_FILTERS: FilterState = {
   regions: [],
   projectTypes: [],
   projectLevels: [],
+  manualReviewOnly: false,
   query: '',
   customValues: Object.create(null) as Record<string, string[]>
 };
@@ -206,6 +208,7 @@ export function filterProjectKeys(
       && matchesBands(filters.reserveCycleBands, reserveAge, RESERVE_CYCLE_BANDS)
       && (filters.categories.length === 0 || findings.some((finding) => filters.categories.includes(finding.category)))
       && (filters.labels.length === 0 || findings.some((finding) => filters.labels.includes(finding.label)))
+      && (!filters.manualReviewOnly || actionableRowKeys.has(key))
       && (filters.reviewStatuses.length === 0 || (reviewStatus !== null && filters.reviewStatuses.includes(reviewStatus)))
       && customMatches(row, filters.customValues)
       && textMatches(row, filters.query);
@@ -287,6 +290,7 @@ const formatAmount = (value: number) => value.toLocaleString('zh-CN', { maximumF
 export function describeFilters(filters: FilterState): string[] {
   return [
     ...(filters.query.trim() ? [`关键词：${filters.query.trim()}`] : []),
+    ...(filters.manualReviewOnly ? ['只看需要人工判断'] : []),
     ...describeMany('客户名称', filters.customerNames),
     ...describeMany('部门', filters.departments),
     ...describeMany('销售经理', filters.salesManagers),

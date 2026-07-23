@@ -3,6 +3,7 @@ import type { AnalysisResult } from '../domain/analysis';
 import type { FilterState } from '../domain/filters';
 import type { ReviewSummaryData } from '../domain/report';
 import type { ReviewRecordMap, ReviewStatus } from '../domain/review';
+import { projectKey } from '../domain/project';
 import { buildProjectWorkbenchRows } from '../domain/workbench';
 import { AnalysisOverview } from './AnalysisOverview';
 import { ProjectIssueList } from './ProjectIssueList';
@@ -12,6 +13,7 @@ type WorkspaceTab = 'overview' | 'projects' | 'summary';
 
 interface AnalysisWorkspaceProps {
   analysis: AnalysisResult;
+  relationAnalysis?: AnalysisResult;
   fullCount: number;
   filters: FilterState;
   reviews: ReviewRecordMap;
@@ -28,11 +30,15 @@ const tabs: Array<{ id: WorkspaceTab; label: string }> = [
   { id: 'summary', label: '复盘摘要' }
 ];
 
-export function AnalysisWorkspace({ analysis, fullCount, filters, reviews, filterControls, summary, onChangeReview, onDownloadMarkdown, onDownloadExcel }: AnalysisWorkspaceProps) {
+export function AnalysisWorkspace({ analysis, relationAnalysis = analysis, fullCount, filters, reviews, filterControls, summary, onChangeReview, onDownloadMarkdown, onDownloadExcel }: AnalysisWorkspaceProps) {
   const [activeTab, setActiveTab] = useState<WorkspaceTab>('overview');
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
-  const rows = useMemo(() => buildProjectWorkbenchRows(analysis), [analysis]);
+  const visibleKeys = useMemo(() => new Set(analysis.rows.map(projectKey)), [analysis.rows]);
+  const rows = useMemo(
+    () => buildProjectWorkbenchRows(relationAnalysis).filter((row) => visibleKeys.has(row.rowKey)),
+    [relationAnalysis, visibleKeys]
+  );
   const issueRows = useMemo(() => rows.filter((row) => row.findings.length > 0), [rows]);
   const filterSignature = JSON.stringify(filters);
 

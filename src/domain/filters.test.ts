@@ -168,6 +168,7 @@ describe('global analysis filters', () => {
       { value: '已忽略', count: 0 }
     ]);
     expect(filterProjectKeys(analysis, {}, { ...EMPTY_FILTERS, reviewStatuses: ['待复核'] })).toEqual(new Set());
+    expect(filterProjectKeys(analysis, {}, { ...EMPTY_FILTERS, manualReviewOnly: true })).toEqual(new Set());
   });
 
   it('uses manual finding keys for status filtering even when finding level is informational', () => {
@@ -185,6 +186,8 @@ describe('global analysis filters', () => {
     }};
 
     expect(filterProjectKeys(analysis, reviews, { ...EMPTY_FILTERS, reviewStatuses: ['确认业务风险'] })).toEqual(new Set(['duplicate']));
+    expect(filterProjectKeys(analysis, reviews, { ...EMPTY_FILTERS, manualReviewOnly: true })).toEqual(new Set(['duplicate']));
+    expect(describeFilters({ ...EMPTY_FILTERS, manualReviewOnly: true })).toContain('只看需要人工判断');
   });
 
   it('counts explicit review states and classifies zero amounts as abnormal', () => {

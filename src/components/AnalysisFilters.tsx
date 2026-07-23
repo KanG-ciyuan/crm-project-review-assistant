@@ -18,7 +18,7 @@ interface AnalysisFiltersProps {
   onChange: (filters: FilterState) => void;
 }
 
-type ArrayFilterKey = Exclude<keyof FilterState, 'query' | 'customValues' | 'amountMinWan' | 'amountMaxWan'>;
+type ArrayFilterKey = Exclude<keyof FilterState, 'query' | 'customValues' | 'amountMinWan' | 'amountMaxWan' | 'manualReviewOnly'>;
 
 interface ActiveChip {
   key: string;
@@ -75,6 +75,7 @@ export function AnalysisFilters({ analysis, filters, reviews, selectedCount, tot
 
   const chips: ActiveChip[] = [];
   if (filters.query.trim()) chips.push({ key: 'query', label: `关键词：${filters.query.trim()}`, remove: () => onChange({ ...filters, query: '' }) });
+  if (filters.manualReviewOnly) chips.push({ key: 'manualReviewOnly', label: '只看需要人工判断', remove: () => onChange({ ...filters, manualReviewOnly: false }) });
   const chipGroups: Array<[ArrayFilterKey, string]> = [
     ['customerNames', '客户名称'], ['departments', '部门'], ['salesManagers', '销售经理'], ['statuses', '项目状态'],
     ['probabilityBands', '成单概率'], ['amountBands', '金额等级'], ['followUpBands', '跟进周期'],
@@ -102,6 +103,7 @@ export function AnalysisFilters({ analysis, filters, reviews, selectedCount, tot
       <label className="filter-search"><Search size={15} aria-hidden="true" /><span className="visually-hidden">搜索项目</span>
         <input type="search" aria-label="搜索项目" value={filters.query} placeholder="搜索项目、客户、编码或自定义字段" onChange={(event) => onChange({ ...filters, query: event.target.value })} />
       </label>
+      <label className="manual-review-toggle"><input type="checkbox" checked={filters.manualReviewOnly} onChange={(event) => onChange({ ...filters, manualReviewOnly: event.target.checked })} />只看需要人工判断</label>
       <strong aria-live="polite">当前筛选 {selectedCount} / 全部 {totalCount} 个项目</strong>
       <button type="button" className="filter-clear" onClick={() => onChange(EMPTY_FILTERS)} disabled={chips.length === 0}>清除全部筛选</button>
     </div>

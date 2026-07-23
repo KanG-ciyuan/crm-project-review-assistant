@@ -157,6 +157,21 @@ describe('AnalysisFilters', () => {
     expect(screen.getByText('当前筛选 7 / 全部 12 个项目')).toBeInTheDocument();
   });
 
+  it('provides a one-click manual-review-only filter', async () => {
+    const user = userEvent.setup();
+    render(<FilterHarness />);
+
+    const toggle = screen.getByRole('checkbox', { name: '只看需要人工判断' });
+    expect(toggle).not.toBeChecked();
+    await user.click(toggle);
+    expect(toggle).toBeChecked();
+    expect(screen.getByRole('button', { name: '移除筛选：只看需要人工判断' })).toBeInTheDocument();
+
+    await user.click(toggle);
+    expect(toggle).not.toBeChecked();
+    expect(screen.queryByRole('button', { name: '移除筛选：只看需要人工判断' })).not.toBeInTheDocument();
+  });
+
   it('keeps prototype-like custom fields selectable and removable as collision-safe chips', async () => {
     const user = userEvent.setup();
     const customFields = Object.create(null) as Record<string, string>;

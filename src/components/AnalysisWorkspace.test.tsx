@@ -126,4 +126,31 @@ describe('AnalysisWorkspace', () => {
     expect(onDownloadMarkdown).toHaveBeenCalledOnce();
     expect(onDownloadExcel).toHaveBeenCalledWith(new Set());
   });
+
+  it('keeps related-project evidence from outside the current filtered scope', async () => {
+    const user = userEvent.setup();
+    const collision: Finding[] = [
+      { ...findings[1], ruleId: 'cross-seller-collision', rowKey: 'first', projectId: 'A', projectName: first.projectName, customerName: first.customerName, department: first.department, salesManager: first.salesManager, relationKey: 'collision:one', label: '疑似撞单待核验' },
+      { ...findings[1], ruleId: 'cross-seller-collision', rowKey: 'second', projectId: 'B', projectName: second.projectName, customerName: second.customerName, department: second.department, salesManager: second.salesManager, relationKey: 'collision:one', label: '疑似撞单待核验' }
+    ];
+    const completeAnalysis = buildAnalysis([first, second], collision, new Date(2026, 6, 23, 12));
+    const filteredAnalysis = buildAnalysis([first], collision.filter((finding) => finding.rowKey === 'first'), new Date(2026, 6, 23, 12));
+
+    render(<AnalysisWorkspace
+      analysis={filteredAnalysis}
+      relationAnalysis={completeAnalysis}
+      fullCount={2}
+      filters={{ ...EMPTY_FILTERS, salesManagers: ['销售甲'] }}
+      reviews={{}}
+      filterControls={<div />}
+      summary={createReviewSummary(filteredAnalysis, {})}
+      onChangeReview={vi.fn()}
+      onDownloadMarkdown={vi.fn()}
+      onDownloadExcel={vi.fn()}
+    />);
+
+    await user.click(screen.getByRole('tab', { name: '项目问题清单' }));
+    expect(screen.getByText(/关联项目：B \/ .*销售乙/)).toBeInTheDocument();
+    expect(screen.getAllByRole('checkbox', { name: /选择项目/ })).toHaveLength(1);
+  });
 });

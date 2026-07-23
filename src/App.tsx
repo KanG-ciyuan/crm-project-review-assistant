@@ -149,9 +149,10 @@ export default function App() {
   }
 
   function downloadProjectDetails(selection: Set<string>) {
-    if (!visibleAnalysis) return;
-    const scope = selection.size > 0 ? projectAnalysis(visibleAnalysis, selection) : visibleAnalysis;
-    const workbook = createProjectDetailWorkbook(buildProjectWorkbenchRows(scope), reviewRecords);
+    if (!analysis || !visibleAnalysis) return;
+    const exportKeys = selection.size > 0 ? selection : selectedKeys;
+    const rows = buildProjectWorkbenchRows(analysis).filter((row) => exportKeys.has(row.rowKey));
+    const workbook = createProjectDetailWorkbook(rows, reviewRecords);
     const data = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
     const suffix = selection.size > 0 ? `所选${selection.size}个项目` : '当前筛选';
     downloadBlob(
@@ -194,6 +195,7 @@ export default function App() {
         {storageError && <section className="notice storage-notice" role="alert"><h2>自动保存失败</h2><p>{storageError}</p><button type="button" className="secondary" onClick={() => persistReviews(reviewRecords)}>重试保存</button></section>}
         <AnalysisWorkspace
           analysis={visibleAnalysis}
+          relationAnalysis={analysis}
           fullCount={analysis.rows.length}
           filters={filters}
           reviews={reviewRecords}
