@@ -488,6 +488,27 @@ describe('confirmed To B rule pack', () => {
       .toEqual(new Set(similarFindings.map((item) => item.relationKey)));
   });
 
+  it('preserves every similar-name pair when no stable business field distinguishes duplicate records', () => {
+    const rows = [
+      makeProject({ sourceKey: 'identical-a', projectId: '', projectName: '华城医院数字化改造项目' }),
+      makeProject({ sourceKey: 'identical-b', projectId: '', projectName: '华城医院数字化改造项目' }),
+      makeProject({ sourceKey: 'identical-third', projectId: '', projectName: '华城医院数字化改造工程' })
+    ];
+    const similarFindings = evaluateRulePack(rows, today)
+      .filter((item) => item.ruleId === 'similar-name');
+    const renamedSourceFindings = evaluateRulePack(rows.map((row, index) => ({
+      ...row,
+      sourceKey: `identical-reimport:row-${index + 1000}`
+    })), today)
+      .filter((item) => item.ruleId === 'similar-name');
+
+    expect(similarFindings).toHaveLength(4);
+    expect(new Set(similarFindings.map((item) => item.relationKey)).size).toBe(1);
+    expect(renamedSourceFindings).toHaveLength(4);
+    expect(new Set(renamedSourceFindings.map((item) => item.relationKey)))
+      .toEqual(new Set(similarFindings.map((item) => item.relationKey)));
+  });
+
   it('reports blank mapped identity and ownership fields with specific Chinese names', () => {
     const findings = evaluateRulePack([
       makeProject({ projectId: '', projectName: ' ', customerName: '', department: '', salesManager: '' })

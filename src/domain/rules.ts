@@ -400,7 +400,19 @@ function evaluateDuplicates(rows: ProjectRow[]): Finding[] {
       results.push({ ...finding(right, 'similar-name', '疑似重复与撞单', '名称相似待核验', `与“${left.projectName}”名称相似，仅作人工核验提示`, 'info'), relationKey });
     }
   }
-  return [...new Map(results.map((item) => [`${item.rowKey}\u0000${item.ruleId}\u0000${item.relationKey ?? ''}`, item])).values()];
+  const deduplicated: Finding[] = [];
+  const seen = new Set<string>();
+  for (const item of results) {
+    if (item.ruleId === 'similar-name') {
+      deduplicated.push(item);
+      continue;
+    }
+    const key = `${item.rowKey}\u0000${item.ruleId}\u0000${item.relationKey ?? ''}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    deduplicated.push(item);
+  }
+  return deduplicated;
 }
 
 function evaluateProbability(row: ProjectRow): Finding[] {
