@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { makeProject } from '../test/fixtures';
 import { buildAnalysis } from './analysis';
-import { createReviewReport, formatLocalDate } from './report';
+import { createReviewReport, createReviewSummary, formatLocalDate } from './report';
 import type { Finding } from './rules';
 import type { ReviewRecordMap } from './review';
 
@@ -64,7 +64,7 @@ describe('createReviewReport', () => {
     const report = createReviewReport(projected, mixedReviews, reportDate, ['部门：华东部']);
 
     expect(report).not.toContain('不应泄漏项目');
-    expect(report.match(/^\d+\. /gm)?.length ?? 0).toBeLessThanOrEqual(6);
+    expect(report.match(/^\d+\. /gm)?.length ?? 0).toBeLessThanOrEqual(3);
     const peopleSection = report.split('## 三、重点部门与负责人')[1].split('## 四、规则分布摘要')[0];
     expect(peopleSection.match(/^- /gm)?.length ?? 0).toBeLessThanOrEqual(5);
   });
@@ -77,8 +77,8 @@ describe('createReviewReport', () => {
     expect(report).toContain('确认数据错误 0 个');
   });
 
-  it('does not grow linearly with project count', () => {
-    const rows = Array.from({ length: 12 }, (_, index) => makeProject({
+  it('does not grow linearly when summarizing 400 projects', () => {
+    const rows = Array.from({ length: 400 }, (_, index) => makeProject({
       sourceKey: `row-${index + 1}`,
       projectId: `P-${index + 1}`,
       projectName: `完整导出项目${index + 1}`
@@ -100,8 +100,21 @@ describe('createReviewReport', () => {
 
     const report = createReviewReport(buildAnalysis(rows, manyFindings, reportDate), {}, reportDate);
 
-    expect(report).not.toContain('完整导出项目12');
-    expect(report.length).toBeLessThan(3000);
+    expect(report).not.toContain('完整导出项目400');
+    expect(report.split('\n').length).toBeLessThan(90);
+    expect(report.match(/^\d+\. /gm)?.length ?? 0).toBeLessThanOrEqual(3);
+  });
+
+  it('creates one bounded structured summary for markdown and html consumers', () => {
+    const summary = createReviewSummary(analysis, reviews, ['部门：华东部']);
+
+    expect(summary.overallConclusions.length).toBeLessThanOrEqual(3);
+    expect(summary.priorityIssues.length).toBeLessThanOrEqual(4);
+    expect(summary.focusScopes.length).toBeLessThanOrEqual(5);
+    expect(summary.actions.length).toBeLessThanOrEqual(3);
+    expect(summary.scope).toEqual(['部门：华东部']);
+    expect(summary.meta.title).toBe('储备项目经营复盘');
+    expect(summary.ruleDistribution.reviewStatuses).toHaveLength(4);
   });
 
   it('ranks issue labels by distinct projects and ranks owners across both types', () => {

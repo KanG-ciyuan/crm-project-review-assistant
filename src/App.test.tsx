@@ -216,7 +216,8 @@ it('projects one global filter across metrics and result areas without changing 
   const reportValue = (screen.getByLabelText('经营复盘草稿') as HTMLTextAreaElement).value;
   expect(screen.getByText('当前 1 / 全部 2 个项目')).toBeInTheDocument();
   expect(screen.getByText('筛选范围：部门：华东部')).toBeInTheDocument();
-  expect(reportValue).toContain('华东超期项目');
+  expect(reportValue).toContain('跟进超期：涉及 1 个项目');
+  expect(reportValue).not.toContain('华东超期项目');
   expect(reportValue).not.toContain('华南超期项目');
   expect(reportValue).toContain('筛选范围：部门：华东部');
 
@@ -261,10 +262,13 @@ it('projects one global filter across metrics and result areas without changing 
   });
   const currentExport = await readBlob(exportedBlobs[0]);
   const allExport = await readBlob(exportedBlobs[1]);
-  expect(currentExport).toContain('华东超期项目');
+  expect(currentExport).toContain('筛选范围：部门：华东部');
+  expect(currentExport).toContain('跟进超期：涉及 1 个项目');
+  expect(currentExport).not.toContain('华东超期项目');
   expect(currentExport).not.toContain('华南超期项目');
-  expect(allExport).toContain('华东超期项目');
-  expect(allExport).toContain('华南超期项目');
+  expect(allExport).toContain('跟进超期：涉及 2 个项目');
+  expect(allExport).not.toContain('华东超期项目');
+  expect(allExport).not.toContain('华南超期项目');
   expect(allExport).not.toContain('筛选范围：');
 
   await user.click(screen.getByRole('button', { name: '清除全部筛选' }));
@@ -323,7 +327,7 @@ it('analyzes an arbitrary Excel workflow and keeps seller filters, findings, met
   expect(within(amountMetric).getByText('100')).toBeInTheDocument();
   const report = (screen.getByLabelText('经营复盘草稿') as HTMLTextAreaElement).value;
   expect(report).toContain('销售经理：销售甲');
-  expect(report).toContain('甲方超期商机');
+  expect(report).not.toContain('甲方超期商机');
   expect(report).toContain('跟进超期');
   expect(report).not.toContain('乙方正常商机');
 });
