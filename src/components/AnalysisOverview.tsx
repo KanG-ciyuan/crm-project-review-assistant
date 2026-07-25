@@ -1,12 +1,11 @@
 import type { AnalysisResult, BreakdownItem } from '../domain/analysis';
 import type { ProjectWorkbenchRow } from '../domain/workbench';
+import { formatAmountWan } from '../lib/format';
 
 interface AnalysisOverviewProps {
   analysis: AnalysisResult;
   rows: ProjectWorkbenchRow[];
 }
-
-const formatAmount = (value: number) => value.toLocaleString('zh-CN', { maximumFractionDigits: 2 });
 
 export function AnalysisOverview({ analysis, rows }: AnalysisOverviewProps) {
   const labelProjects = new Map<string, Set<string>>();
@@ -22,7 +21,7 @@ export function AnalysisOverview({ analysis, rows }: AnalysisOverviewProps) {
   return <div className="analysis-overview">
     <section className="metrics" aria-label="分析总览指标">
       <Metric label="项目总数" value={analysis.overview.projectCount} sub="当前筛选" />
-      <Metric label="储备金额" value={formatAmount(analysis.overview.totalAmountWan)} sub="单位：万元" />
+      <Metric label="储备金额" value={formatAmountWan(analysis.overview.totalAmountWan)} sub="统一金额口径" />
       <Metric label="客观问题项目" value={rows.filter((row) => row.factFindings.length > 0).length} sub="规则事实" />
       <Metric label="需要人工判断" value={rows.filter((row) => row.manualFindings.length > 0).length} sub="待业务确认" />
       <Metric label="经营观察" value={rows.filter((row) => row.observationFindings.length > 0).length} sub="不直接判定问题" />
@@ -44,7 +43,7 @@ function AmountBreakdown({ title, items }: { title: string; items: BreakdownItem
   return <section className="chart-card"><h2>{title}</h2>{items.length === 0
     ? <p className="no-issues">暂无数据。</p>
     : items.slice(0, 6).map((item) => <div className="bar-row" key={item.name}>
-      <span>{item.name}</span><div className="track"><i style={{ width: `${(item.amountWan / max) * 100}%` }} /></div><b>{formatAmount(item.amountWan)} 万</b>
+      <span>{item.name}</span><div className="track"><i style={{ width: `${(item.amountWan / max) * 100}%` }} /></div><b>{formatAmountWan(item.amountWan)}</b>
     </div>)}</section>;
 }
 
