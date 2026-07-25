@@ -3,6 +3,7 @@ import { amountInWan } from '../domain/project';
 import { REVIEW_STATUSES, type ReviewRecordMap, type ReviewStatus } from '../domain/review';
 import type { Finding } from '../domain/rules';
 import type { ProjectWorkbenchRow, RelatedProject } from '../domain/workbench';
+import { formatAmountWan } from '../lib/format';
 
 const PAGE_SIZE = 50;
 
@@ -16,7 +17,6 @@ interface ProjectIssueListProps {
   resetKey?: string;
 }
 
-const formatAmount = (value: number) => value.toLocaleString('zh-CN', { maximumFractionDigits: 2 });
 const displayDate = (value: string | null) => value || '—';
 
 export function ProjectIssueList({ rows, reviews, onChangeReview, onExportSelection, selectedKeys: controlledKeys, onSelectionChange, resetKey = '' }: ProjectIssueListProps) {
@@ -93,7 +93,7 @@ function ProjectRow({ row, review, selected, onToggle, onChangeReview }: {
   const amount = amountInWan(project);
   return <tr>
     <td data-label="选择"><input type="checkbox" aria-label={`选择项目 ${projectLabel}`} checked={selected} onChange={onToggle} /></td>
-    <td data-label="项目摘要"><div className="project-summary"><strong>{project.projectName || '未填写项目名称'}</strong><span>{project.projectId || '未填写编号'}</span><span>{project.customerName || '未填写客户'}</span><span>{amount === null ? '—' : `${formatAmount(amount)} 万`}</span></div></td>
+    <td data-label="项目摘要"><div className="project-summary"><strong>{project.projectName || '未填写项目名称'}</strong><span>{project.projectId || '未填写编号'}</span><span>{project.customerName || '未填写客户'}</span><span>{amount === null ? '—' : formatAmountWan(amount)}</span></div></td>
     <td data-label="部门负责人"><div className="owner-summary"><span>{project.department || '未填写部门'}</span><span>{project.salesManager || '未填写负责人'}</span></div></td>
     <td data-label="关键日期"><div className="date-stack">
       <span>创建 {displayDate(project.createdAt)}</span>

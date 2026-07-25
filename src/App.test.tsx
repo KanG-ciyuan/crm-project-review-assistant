@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, screen, within } from '@testing-library/rea
 import userEvent from '@testing-library/user-event';
 import { afterEach, expect, it, vi } from 'vitest';
 import * as XLSX from 'xlsx';
-import App from './App';
+import App, { ReviewTool } from './App';
 import { formatLocalDate } from './domain/report';
 import { loadReviewRecords, reconcileReviewRecords, saveReviewRecords, updateReviewRecord } from './domain/review';
 import * as workbookApi from './lib/workbook';
@@ -12,6 +12,17 @@ afterEach(() => {
   cleanup();
   vi.useRealTimers();
   vi.restoreAllMocks();
+});
+
+it('opens the real Excel import tool from the approved product landing page', async () => {
+  const user = userEvent.setup();
+  render(<App />);
+
+  expect(screen.getByRole('heading', { name: /CRM 储备项目/ })).toBeInTheDocument();
+  expect(within(screen.getByLabelText('CRM 储备项目运营复盘助手工作台预览')).queryByRole('img')).not.toBeInTheDocument();
+  await user.click(within(screen.getByRole('navigation', { name: '产品导航' })).getByRole('button', { name: '开始分析' }));
+
+  expect(screen.getByLabelText('选择 .xlsx 文件')).toBeInTheDocument();
 });
 
 it('retains a user-selected review status after a page-style storage reload', () => {
@@ -43,7 +54,7 @@ it('retains a user-selected review status after a page-style storage reload', ()
 });
 
 it('shows email and GitHub feedback links on the import page', () => {
-  render(<App />);
+  render(<ReviewTool />);
 
   expect(screen.getByRole('link', { name: '邮件反馈' })).toHaveAttribute('href', 'mailto:88416563@qq.com');
   expect(screen.getByRole('link', { name: '代码与版本' })).toHaveAttribute('href', 'https://github.com/KanG-ciyuan/crm-project-review-assistant');
@@ -54,7 +65,7 @@ it('copies the feedback email address from the footer', async () => {
   const writeText = vi.fn().mockResolvedValue(undefined);
   Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
 
-  render(<App />);
+  render(<ReviewTool />);
   await user.click(screen.getByRole('button', { name: '复制邮箱' }));
 
   expect(writeText).toHaveBeenCalledWith('88416563@qq.com');
@@ -73,7 +84,7 @@ it('opens smart confirmation for an arbitrary worksheet instead of requiring fix
     sheetNames: ['自定义商机表']
   });
 
-  render(<App />);
+  render(<ReviewTool />);
   await user.upload(screen.getByLabelText('选择 .xlsx 文件'), new File(['content'], '客户商机.xlsx'));
 
   expect(await screen.findByRole('heading', { name: '有 1 项需要确认' })).toBeInTheDocument();
@@ -99,7 +110,7 @@ it('restarts the wizard when a same-name file and sheet are uploaded again', asy
     .mockResolvedValueOnce({ workbook: firstWorkbook, sheetNames: ['商机表'] })
     .mockResolvedValueOnce({ workbook: secondWorkbook, sheetNames: ['商机表'] });
 
-  render(<App />);
+  render(<ReviewTool />);
   const input = screen.getByLabelText('选择 .xlsx 文件');
   await user.upload(input, new File(['first'], '商机.xlsx'));
   await user.click(await screen.findByRole('button', { name: '开始分析' }));
@@ -115,7 +126,7 @@ it('restarts the wizard when a same-name file and sheet are uploaded again', asy
 
 it('keeps the file picker reachable from the keyboard', async () => {
   const user = userEvent.setup();
-  render(<App />);
+  render(<ReviewTool />);
   const input = screen.getByLabelText('选择 .xlsx 文件');
 
   expect(input).not.toHaveAttribute('hidden');
@@ -134,7 +145,7 @@ it('runs a simple workbook through the smart import path', async () => {
   ]), '商机表');
   vi.spyOn(workbookApi, 'inspectWorkbook').mockResolvedValue({ workbook, sheetNames: ['商机表'] });
 
-  render(<App />);
+  render(<ReviewTool />);
   await user.upload(screen.getByLabelText('选择 .xlsx 文件'), new File(['content'], '商机.xlsx'));
   await user.click(await screen.findByRole('button', { name: '开始分析' }));
   expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual(['分析总览', '项目问题清单', '复盘摘要']);
@@ -149,7 +160,7 @@ it('does not create a review status control for objective fact findings', async 
   ]), '商机表');
   vi.spyOn(workbookApi, 'inspectWorkbook').mockResolvedValue({ workbook, sheetNames: ['商机表'] });
 
-  render(<App />);
+  render(<ReviewTool />);
   await user.upload(screen.getByLabelText('选择 .xlsx 文件'), new File(['content'], '商机.xlsx'));
   await user.click(await screen.findByRole('button', { name: '开始分析' }));
   await user.click(screen.getByRole('tab', { name: '项目问题清单' }));
@@ -169,7 +180,7 @@ it('keeps review input visible and offers retry when browser storage fails', asy
   vi.spyOn(workbookApi, 'inspectWorkbook').mockResolvedValue({ workbook, sheetNames: ['商机表'] });
   vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('quota'); });
 
-  render(<App />);
+  render(<ReviewTool />);
   await user.upload(screen.getByLabelText('选择 .xlsx 文件'), new File(['content'], '商机.xlsx'));
   await user.click(await screen.findByRole('button', { name: '开始分析' }));
   await user.click(screen.getByRole('tab', { name: '项目问题清单' }));
@@ -198,7 +209,7 @@ it('runs the confirmed 30-day rule pack and removes the legacy percentile rule',
   vi.useFakeTimers({ shouldAdvanceTime: true });
   vi.setSystemTime(new Date(2026, 6, 21, 12));
 
-  render(<App />);
+  render(<ReviewTool />);
   await user.upload(screen.getByLabelText('选择 .xlsx 文件'), new File(['content'], '商机.xlsx'));
   await user.selectOptions(await screen.findByLabelText('金额单位'), '万元');
   await user.click(screen.getByRole('button', { name: '开始分析' }));
@@ -223,7 +234,7 @@ it('projects one global filter across metrics and result areas without changing 
   vi.useFakeTimers({ shouldAdvanceTime: true });
   vi.setSystemTime(new Date(2026, 6, 21, 12));
 
-  render(<App />);
+  render(<ReviewTool />);
   await user.upload(screen.getByLabelText('选择 .xlsx 文件'), new File(['content'], '商机.xlsx'));
   await user.selectOptions(await screen.findByLabelText('金额单位'), '万元');
   await user.click(screen.getByRole('button', { name: '开始分析' }));
@@ -316,7 +327,7 @@ it('analyzes an arbitrary Excel workflow and keeps seller filters, findings, met
   vi.useFakeTimers({ shouldAdvanceTime: true });
   vi.setSystemTime(new Date(2026, 6, 21, 12));
 
-  render(<App />);
+  render(<ReviewTool />);
   await user.upload(
     screen.getByLabelText('选择 .xlsx 文件'),
     new File([bytes], '企业机会台账.xlsx', { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
@@ -335,7 +346,7 @@ it('analyzes an arbitrary Excel workflow and keeps seller filters, findings, met
   const amountMetric = within(overview).getByText('储备金额').closest('article')!;
   expect(screen.getByText('当前筛选 3 / 全部 3 个项目')).toBeInTheDocument();
   expect(within(projectCountMetric).getByText('3')).toBeInTheDocument();
-  expect(within(amountMetric).getByText('600')).toBeInTheDocument();
+  expect(within(amountMetric).getByText('600 万')).toBeInTheDocument();
   await user.click(screen.getByRole('tab', { name: '项目问题清单' }));
   expect(screen.getByText('甲方超期商机')).toBeInTheDocument();
   expect(screen.getAllByText('跟进超期').length).toBeGreaterThan(0);
@@ -355,7 +366,7 @@ it('analyzes an arbitrary Excel workflow and keeps seller filters, findings, met
   await user.click(screen.getByRole('tab', { name: '分析总览' }));
   const filteredOverview = screen.getByRole('region', { name: '分析总览指标' });
   expect(within(within(filteredOverview).getByText('项目总数').closest('article')!).getByText('1')).toBeInTheDocument();
-  expect(within(within(filteredOverview).getByText('储备金额').closest('article')!).getByText('100')).toBeInTheDocument();
+  expect(within(within(filteredOverview).getByText('储备金额').closest('article')!).getByText('100 万')).toBeInTheDocument();
   await user.click(screen.getByRole('tab', { name: '复盘摘要' }));
   expect(screen.getByText('筛选范围：销售经理：销售甲')).toBeInTheDocument();
 });
@@ -371,7 +382,7 @@ it('isolates review decisions by confirmed data source instead of file name', as
   ]), '商机表');
   vi.spyOn(workbookApi, 'inspectWorkbook').mockResolvedValue({ workbook, sheetNames: ['商机表'] });
 
-  render(<App />);
+  render(<ReviewTool />);
   const input = screen.getByLabelText('选择 .xlsx 文件');
   const setSource = async (source: string) => {
     const sourceInput = screen.getByLabelText('数据来源标识（企业/账套）');
@@ -420,7 +431,7 @@ it('requires a nonblank confirmed data source before opening the import wizard',
   ]), '商机表');
   vi.spyOn(workbookApi, 'inspectWorkbook').mockResolvedValue({ workbook, sheetNames: ['商机表'] });
 
-  render(<App />);
+  render(<ReviewTool />);
   await user.upload(screen.getByLabelText('选择 .xlsx 文件'), new File(['content'], '某企业台账.xlsx'));
   const sourceInput = screen.getByLabelText('数据来源标识（企业/账套）');
   expect(sourceInput).toHaveValue('某企业台账');

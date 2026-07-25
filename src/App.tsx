@@ -1,11 +1,14 @@
 import { useMemo, useState } from 'react';
-import { Copy, Download, FileSpreadsheet, GitFork, Mail, ShieldCheck, Upload } from 'lucide-react';
+import { ArrowLeft, Copy, Download, FileSpreadsheet, GitFork, Mail, ShieldCheck, Upload } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import './review.css';
 import './filters.css';
+import './landing.css';
+import './tool-theme.css';
 import { AnalysisFilters } from './components/AnalysisFilters';
 import { AnalysisWorkspace } from './components/AnalysisWorkspace';
 import { ImportWizard, type ImportReadyPayload } from './components/ImportWizard';
+import { ProductLanding } from './components/ProductLanding';
 import { buildAnalysis, evaluateRulePack, projectAnalysis, type AnalysisResult, type CanonicalFieldKey } from './domain/analyze';
 import { describeFilters, EMPTY_FILTERS, filterProjectKeys, type FilterState } from './domain/filters';
 import { createProjectDetailWorkbook } from './domain/projectDetailExport';
@@ -17,6 +20,32 @@ import { inspectSheet, inspectWorkbook, type WorkbookInspection } from './lib/wo
 const suggestedSourceNamespace = (fileName: string) => fileName.replace(/\.xlsx$/i, '').trim();
 
 export default function App() {
+  const [view, setView] = useState<'landing' | 'tool'>('landing');
+
+  function openTool() {
+    window.history.replaceState(null, '', '#analysis');
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+    document.documentElement.scrollLeft = 0;
+    document.body.scrollLeft = 0;
+    setView('tool');
+  }
+
+  function openLanding() {
+    window.history.replaceState(null, '', window.location.pathname);
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+    document.documentElement.scrollLeft = 0;
+    document.body.scrollLeft = 0;
+    setView('landing');
+  }
+
+  return view === 'landing'
+    ? <ProductLanding onStart={openTool} />
+    : <ReviewTool onBack={openLanding} />;
+}
+
+export function ReviewTool({ onBack }: { onBack?: () => void }) {
   const [inspection, setInspection] = useState<WorkbookInspection | null>(null);
   const [fileName, setFileName] = useState('');
   const [sourceNamespace, setSourceNamespace] = useState('');
@@ -172,7 +201,7 @@ export default function App() {
 
   return <div className="app-shell">
     <aside className="sidebar">
-      <div className="brand"><div className="brand-mark">CR</div><div><strong>CRM 项目运营复盘</strong><span>储备项目分析助手</span></div></div>
+      <div className="brand"><div className="brand-mark">CRM</div><div><strong>CRM 项目运营复盘</strong><span>储备项目分析助手</span></div></div>
       <div className="side-section"><p className="side-label">导入 Excel</p><label className="upload-button"><Upload size={16} /> 选择 .xlsx 文件<input className="visually-hidden-file" aria-label="选择 .xlsx 文件" type="file" accept=".xlsx" onChange={(event) => onFileChange(event.target.files?.[0] ?? null)} /></label>
         {fileName && <div className="file-state"><FileSpreadsheet size={17} /><div><b>{fileName}</b><span>{importReady?.rows.length ?? '待确认'} 条项目记录</span></div></div>}
         {fileName && <label className="source-namespace"><span>数据来源标识（企业/账套）</span><input required aria-label="数据来源标识（企业/账套）" aria-invalid={!confirmedSourceNamespace} value={sourceNamespace} onChange={(event) => changeSourceNamespace(event.target.value)} /><small>同一企业或 CRM 账套每次重导请保持一致；不同企业或账套必须使用不同标识。</small></label>}
@@ -187,7 +216,7 @@ export default function App() {
       <div className="sidebar-note"><ShieldCheck size={16} /><span>文件仅在当前浏览器中读取和分析，不会上传原始 Excel。</span></div>
     </aside>
     <main className="content">
-      <header><div><h1>储备项目运营复盘助手</h1><p>以固定规则发现数据质量问题和经营风险，最终结论由业务人员确认。</p></div></header>
+      <header><div><h1>储备项目运营复盘助手</h1><p>以固定规则发现数据质量问题和经营风险，最终结论由业务人员确认。</p></div>{onBack && <button className="tool-back" type="button" onClick={onBack}><ArrowLeft size={15} /> 返回产品介绍</button>}</header>
       {!inspection && <section className="empty import-guide"><FileSpreadsheet size={36} /><h2>上传 CRM 储备项目表</h2><p>支持未加密的 .xlsx 文件，可在导入向导中确认表头、字段关系和业务口径。</p><a className="sample-download" href="/CRM历史项目表-脱敏适配样表.xlsx" download><Download size={15} /> 下载脱敏示例表</a></section>}
       {sheetInspection && !confirmedSourceNamespace && <section className="notice" role="alert"><h2>需要数据来源标识</h2><p>请填写数据来源标识后继续导入。</p></section>}
       {sheetInspection && confirmedSourceNamespace && <ImportWizard key={`${importRevision}:${fileName}:${sheetName}:${sourceNamespace}`} inspection={sheetInspection} sourceNamespace={confirmedSourceNamespace} onReady={startAnalysis} onConfigurationChange={clearImportedAnalysis} />}
