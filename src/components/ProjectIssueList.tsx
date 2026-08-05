@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { amountInWan } from '../domain/project';
-import { REVIEW_STATUSES, type ReviewRecordMap, type ReviewStatus } from '../domain/review';
+import type { ReviewRecordMap, ReviewStatus } from '../domain/review';
 import type { Finding } from '../domain/rules';
 import type { ProjectWorkbenchRow, RelatedProject } from '../domain/workbench';
 import { formatAmountWan } from '../lib/format';
+import { ProjectReviewControl } from './ProjectReviewControl';
 
 const PAGE_SIZE = 50;
 
@@ -89,7 +90,6 @@ function ProjectRow({ row, review, selected, onToggle, onChangeReview }: {
 }) {
   const { project } = row;
   const projectLabel = project.projectId || project.projectName || row.rowKey;
-  const latestHistory = review?.history[review.history.length - 1];
   const amount = amountInWan(project);
   return <tr>
     <td data-label="选择"><input type="checkbox" aria-label={`选择项目 ${projectLabel}`} checked={selected} onChange={onToggle} /></td>
@@ -107,16 +107,12 @@ function ProjectRow({ row, review, selected, onToggle, onChangeReview }: {
       <FindingGroup label="人工判断" findings={row.manualFindings} relatedProjects={row.relatedProjects} />
       <FindingGroup label="经营观察" findings={row.observationFindings} relatedProjects={row.relatedProjects} />
     </div></td>
-    <td data-label="人工判断"><div className="review-cell">{row.manualFindings.length > 0 ? <div className="review-control">
-      <label className="visually-hidden" htmlFor={`review-${row.rowKey}`}>{projectLabel} 审查状态</label>
-      <select id={`review-${row.rowKey}`} aria-label={`${projectLabel} 审查状态`} value={review?.status ?? '待复核'} onChange={(event) => onChangeReview(row.rowKey, { status: event.target.value as ReviewStatus })}>
-        {REVIEW_STATUSES.map((status) => <option key={status}>{status}</option>)}
-      </select>
-      {review?.dataUpdated && <small className="review-updated">数据已更新，待复核</small>}
-      <label className="visually-hidden" htmlFor={`note-${row.rowKey}`}>{projectLabel} 处理说明</label>
-      <input id={`note-${row.rowKey}`} aria-label={`${projectLabel} 处理说明`} value={review?.note ?? ''} maxLength={120} placeholder="填写处理说明（可选）" onChange={(event) => onChangeReview(row.rowKey, { note: event.target.value })} />
-      {latestHistory && <small className="review-history">历史：{latestHistory.status}，{latestHistory.note || '无说明'}</small>}
-    </div> : <span className="information-state">无需人工判断</span>}</div></td>
+    <td data-label="人工判断"><div className="review-cell">{row.manualFindings.length > 0 ? <ProjectReviewControl
+      rowKey={row.rowKey}
+      projectLabel={projectLabel}
+      review={review}
+      onChange={onChangeReview}
+    /> : <span className="information-state">无需人工判断</span>}</div></td>
   </tr>;
 }
 

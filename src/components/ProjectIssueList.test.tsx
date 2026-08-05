@@ -1,4 +1,4 @@
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Finding } from '../domain/rules';
@@ -73,6 +73,23 @@ describe('ProjectIssueList', () => {
     expect(screen.getByLabelText('P-3 审查状态')).toBeInTheDocument();
     expect(screen.getAllByText('无需人工判断')).toHaveLength(2);
     expect(screen.queryByLabelText('P-1 审查状态')).not.toBeInTheDocument();
+  });
+
+  it('routes review changes through the correct row key for two projects', () => {
+    const manualA = finding('similar-name', 'row-001', '名称相似待核验', '项目 A 需要人工核验');
+    const manualB = finding('customer-collision', 'row-002', '客户名称冲突', '项目 B 需要人工核验');
+    const rows = [
+      makeRow(1, { findings: [manualA], factFindings: [], manualFindings: [manualA] }),
+      makeRow(2, { findings: [manualB], factFindings: [], manualFindings: [manualB] })
+    ];
+    const onChangeReview = vi.fn();
+    render(<ProjectIssueList rows={rows} reviews={{}} onChangeReview={onChangeReview} onExportSelection={vi.fn()} />);
+
+    fireEvent.change(screen.getByRole('combobox', { name: 'P-1 审查状态' }), { target: { value: '确认业务风险' } });
+    fireEvent.change(screen.getByRole('textbox', { name: 'P-2 处理说明' }), { target: { value: '交由销售乙复核' } });
+
+    expect(onChangeReview).toHaveBeenNthCalledWith(1, rows[0].rowKey, { status: '确认业务风险' });
+    expect(onChangeReview).toHaveBeenNthCalledWith(2, rows[1].rowKey, { note: '交由销售乙复核' });
   });
 
   it('shows only the peer from the matching relation key under each same-label finding', () => {
