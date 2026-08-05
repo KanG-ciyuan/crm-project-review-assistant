@@ -49,12 +49,11 @@ export interface ReviewSummaryData {
     disclaimer: string;
   };
   scope: string[];
-  // Optional only while the legacy ReviewSummary fixture remains in the tree.
-  executiveConclusions?: string[];
-  decisionItems?: ManagementProjectItem[];
-  priorityProjects?: ManagementProjectItem[];
-  departmentActions?: DepartmentActionItem[];
-  appendix?: {
+  executiveConclusions: string[];
+  decisionItems: ManagementProjectItem[];
+  priorityProjects: ManagementProjectItem[];
+  departmentActions: DepartmentActionItem[];
+  appendix: {
     projectCount: number;
     totalAmountWan: number;
     categories: ReviewSummaryItem[];
@@ -74,14 +73,6 @@ export interface ReviewSummaryData {
   };
   /** @deprecated Remove when ReviewSummary renders departmentActions. */
   actions: string[];
-}
-
-interface ManagementReviewSummaryData extends ReviewSummaryData {
-  executiveConclusions: string[];
-  decisionItems: ManagementProjectItem[];
-  priorityProjects: ManagementProjectItem[];
-  departmentActions: DepartmentActionItem[];
-  appendix: NonNullable<ReviewSummaryData['appendix']>;
 }
 
 export function formatLocalDate(date: Date): string {
@@ -113,6 +104,8 @@ const categoryLabels: Record<FindingCategory, string> = {
   经营结构分析: '经营结构'
 };
 const reviewStatuses: ReviewStatus[] = ['待复核', '确认数据错误', '确认业务风险', '已忽略'];
+// Management reports show only the highest-impact departments; all project evidence remains in priority/appendix models.
+const MAX_DEPARTMENT_ACTIONS = 10;
 const formatAmount = (value: number) => value.toLocaleString('zh-CN', { maximumFractionDigits: 2 });
 const safeValue = (value: string, missing: string) => safeMarkdownInline(value) || missing;
 
@@ -232,20 +225,30 @@ function reviewCounts(rows: ProjectWorkbenchRow[], reviews: ReviewRecordMap): Re
   return counts;
 }
 
-function departmentActions(items: ManagementProjectItem[]): DepartmentActionItem[] {
-  const groups = new Map<string, ManagementProjectItem[]>();
-  items.forEach((item) => groups.set(item.department, [...(groups.get(item.department) ?? []), item]));
-  return [...groups.entries()].map(([department, projects]) => {
+function departmentActions(
+  rows: ProjectWorkbenchRow[],
+  itemsByKey: Map<string, ManagementProjectItem>
+): DepartmentActionItem[] {
+  const groups = new Map<string, Array<{ row: ProjectWorkbenchRow; item: ManagementProjectItem }>>();
+  rows.forEach((row) => {
+    const item = itemsByKey.get(row.rowKey)!;
+    groups.set(item.department, [...(groups.get(item.department) ?? []), { row, item }]);
+  });
+  return [...groups.entries()].map(([department, entries]) => {
+    const projects = entries.map(({ item }) => item);
     const count = (status: ManagementProjectItem['reviewStatus']) => projects.filter((item) => item.reviewStatus === status).length;
     const riskCount = count('确认业务风险');
     const pendingCount = count('待复核');
     const dataErrorCount = count('确认数据错误');
-    const firstEvidence = projects.flatMap((item) => item.evidence)[0] ?? '规则证据待补充';
-    const mainIssue = riskCount > 0
-      ? `确认业务风险 ${riskCount} 个`
-      : pendingCount > 0
-        ? `待复核 ${pendingCount} 个`
-        : dataErrorCount > 0 ? `确认数据错误 ${dataErrorCount} 个` : firstEvidence;
+    const issueCounts = new Map<string, number>();
+    entries.forEach(({ row }) => {
+      const labels = new Set([...row.manualFindings, ...row.factFindings]
+        .map((finding) => safeValue(finding.label, '未命名规则')));
+      labels.forEach((label) => issueCounts.set(label, (issueCounts.get(label) ?? 0) + 1));
+    });
+    const mainIssue = [...issueCounts.entries()]
+      .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0], 'zh-CN'))[0]?.[0]
+      ?? '规则证据待补充';
     const suggestedAction = riskCount > 0
       ? '管理层确认相关项目继续推进、调整阶段或暂停。'
       : pendingCount > 0
@@ -262,14 +265,15 @@ function departmentActions(items: ManagementProjectItem[]): DepartmentActionItem
     };
   }).sort((left, right) => right.projectCount - left.projectCount
     || right.amountWan - left.amountWan
-    || left.department.localeCompare(right.department, 'zh-CN'));
+    || left.department.localeCompare(right.department, 'zh-CN'))
+    .slice(0, MAX_DEPARTMENT_ACTIONS);
 }
 
 export function createReviewSummary(
   analysis: AnalysisResult,
   reviews: ReviewRecordMap,
   filterScope: string[] = []
-): ManagementReviewSummaryData {
+): ReviewSummaryData {
   const workbenchRows = buildProjectWorkbenchRows(analysis);
   const itemsByKey = new Map(workbenchRows.map((row) => [row.rowKey, managementItem(row, reviews)]));
   const counts = reviewCounts(workbenchRows, reviews);
@@ -296,7 +300,6 @@ export function createReviewSummary(
     .map((row) => itemsByKey.get(row.rowKey)!)
     .filter((item) => !priorityKeys.has(item.rowKey))
     .sort(compareAmountAndIdentity);
-  const actionableItems = eligibleRows.map((row) => itemsByKey.get(row.rowKey)!);
   const decisionAmount = decisionItems.reduce((sum, item) => sum + (item.amountWan ?? 0), 0);
   const objectiveAmount = objectiveItems.reduce((sum, item) => sum + (item.amountWan ?? 0), 0);
 
@@ -306,7 +309,7 @@ export function createReviewSummary(
     `有客观规则行动证据的项目 ${objectiveItems.length} 个，涉及金额 ${formatAmount(objectiveAmount)} 万元。`,
     `人工复核已确认 ${counts['确认业务风险'] + counts['确认数据错误']} 个、待复核 ${counts['待复核']} 个、已忽略 ${counts['已忽略']} 个。`
   ];
-  const actionsByDepartment = departmentActions(actionableItems);
+  const actionsByDepartment = departmentActions(eligibleRows, itemsByKey);
   const categories = categoryCounts(analysis);
   const statusDistribution = reviewStatuses.map((status) => ({ status, count: counts[status] }));
 
@@ -343,7 +346,7 @@ export function createReviewSummary(
 const amountText = (amountWan: number | null) => amountWan === null ? '金额未填写' : formatAmount(amountWan);
 const amountDetail = (amountWan: number | null) => amountWan === null ? '金额未填写' : `金额 ${formatAmount(amountWan)} 万元`;
 
-function decisionBlocks(summary: ManagementReviewSummaryData): string {
+function decisionBlocks(summary: ReviewSummaryData): string {
   const priorityKeys = new Set(summary.priorityProjects.map((item) => item.rowKey));
   const visible = summary.decisionItems.filter((item) => priorityKeys.has(item.rowKey));
   if (visible.length === 0) return '本期没有需要管理层决策的项目。';
@@ -384,7 +387,7 @@ export function createReviewReport(
   filterScope: string[] = []
 ): string {
   const generated = createReviewSummary(analysis, reviews, filterScope);
-  const summary: ManagementReviewSummaryData = {
+  const summary: ReviewSummaryData = {
     ...generated,
     meta: { ...generated.meta, generatedDate: formatLocalDate(today) }
   };

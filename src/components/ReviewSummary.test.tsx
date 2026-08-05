@@ -9,6 +9,17 @@ afterEach(cleanup);
 const summary: ReviewSummaryData = {
   meta: { title: '储备项目经营复盘', generatedDate: '2026-07-16', disclaimer: '业务结论须由业务人员确认。' },
   scope: ['部门：华东部'],
+  executiveConclusions: ['本期分析 12 个项目。'],
+  decisionItems: [],
+  priorityProjects: [],
+  departmentActions: [],
+  appendix: {
+    projectCount: 12,
+    totalAmountWan: 0,
+    categories: [{ label: '重复与撞单', projectCount: 3 }],
+    reviewStatuses: [{ status: '待复核', count: 3 }, { status: '确认数据错误', count: 0 }, { status: '确认业务风险', count: 0 }, { status: '已忽略', count: 0 }],
+    remainingProjects: []
+  },
   overallConclusions: ['本期分析 12 个项目。'],
   priorityIssues: [{ label: '名称相似待核验', projectCount: 3 }],
   focusScopes: [{ type: '部门', name: '华东部', projectCount: 3 }],

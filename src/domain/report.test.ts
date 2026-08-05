@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { makeProject } from '../test/fixtures';
 import { buildAnalysis } from './analysis';
-import { createReviewReport, createReviewSummary, formatLocalDate } from './report';
+import { createReviewReport, createReviewSummary, formatLocalDate, type ReviewSummaryData } from './report';
 import type { ProjectRow } from './project';
 import type { ReviewRecordMap, ReviewStatus } from './review';
 import type { Finding, FindingCategory } from './rules';
@@ -47,6 +47,26 @@ function review(project: ProjectRow, status: ReviewStatus, note = ''): ReviewRec
 }
 
 describe('createReviewSummary', () => {
+  it('returns every required field in the public management summary model', () => {
+    const summary: ReviewSummaryData = createReviewSummary(buildAnalysis([], [], reportDate), {});
+    const requiredManagementFields = [
+      summary.executiveConclusions.length,
+      summary.decisionItems.length,
+      summary.priorityProjects.length,
+      summary.departmentActions.length,
+      summary.appendix.projectCount
+    ];
+
+    expect(requiredManagementFields).toEqual([4, 0, 0, 0, 0]);
+    expect(summary).toEqual(expect.objectContaining({
+      executiveConclusions: expect.any(Array),
+      decisionItems: expect.any(Array),
+      priorityProjects: expect.any(Array),
+      departmentActions: expect.any(Array),
+      appendix: expect.any(Object)
+    }));
+  });
+
   it('builds concrete management decisions while preserving the business-review boundary', () => {
     const risk = makeProject({ sourceKey: 'risk', projectId: 'RISK', projectName: '重点风险项目', amount: 6000, department: '华东部' });
     const pending = makeProject({ sourceKey: 'pending', projectId: 'PENDING', projectName: '原因待确认项目', amount: 9000, department: '华南部' });
@@ -163,6 +183,23 @@ describe('createReviewSummary', () => {
     });
     expect(summary.priorityProjects[0].reviewConclusion).not.toContain('客户');
   });
+
+  it('uses the most frequent department rule issue with a stable lexical tie-break', () => {
+    const rows = [
+      makeProject({ sourceKey: 'frequent-1', projectId: 'F-1', department: '高频部门' }),
+      makeProject({ sourceKey: 'frequent-2', projectId: 'F-2', department: '高频部门' }),
+      makeProject({ sourceKey: 'other', projectId: 'F-3', department: '高频部门' }),
+      makeProject({ sourceKey: 'tie-b', projectId: 'T-1', department: '同频部门' }),
+      makeProject({ sourceKey: 'tie-a', projectId: 'T-2', department: '同频部门' })
+    ];
+    const labels = ['高频问题', '高频问题', '其他问题', 'B问题', 'A问题'];
+    const summary = createReviewSummary(buildAnalysis(rows, rows.map((project, index) => finding(
+      project, 'follow-up-overdue', 'action', labels[index], `${labels[index]}的客观证据`, '维护超期待整改'
+    )), reportDate), {});
+
+    expect(summary.departmentActions.find((item) => item.department === '高频部门')?.mainIssue).toBe('高频问题');
+    expect(summary.departmentActions.find((item) => item.department === '同频部门')?.mainIssue).toBe('A问题');
+  });
 });
 
 describe('createReviewReport', () => {
@@ -249,11 +286,17 @@ describe('createReviewReport', () => {
     const rows = Array.from({ length: 400 }, (_, index) => makeProject({
       sourceKey: `row-${index + 1}`,
       projectId: `P-${index + 1}`,
-      projectName: `项目${index + 1}`
+      projectName: `项目${index + 1}`,
+      department: `部门${String(index + 1).padStart(3, '0')}`
     }));
     const findings = rows.map((project) => finding(project, 'similar-name'));
-    const report = createReviewReport(buildAnalysis(rows, findings, reportDate), {}, reportDate);
+    const analysis = buildAnalysis(rows, findings, reportDate);
+    const summary = createReviewSummary(analysis, {});
+    const report = createReviewReport(analysis, {}, reportDate);
 
+    expect(summary.departmentActions).toHaveLength(10);
+    expect(summary.departmentActions[0].department).toBe('部门001');
+    expect(summary.priorityProjects.length + summary.appendix.remainingProjects.length).toBe(400);
     expect(report).toContain('待管理层决策 400 个项目');
     expect(report).toContain('剩余项目：390 个');
     expect(report.split('\n').length).toBeLessThan(180);
