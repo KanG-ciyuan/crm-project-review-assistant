@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -19,6 +20,11 @@ const findings: Finding[] = [
 ];
 const analysis = buildAnalysis([first, second], findings, new Date(2026, 6, 23, 12));
 
+function StatefulFilter() {
+  const [value, setValue] = useState('');
+  return <input aria-label="状态型筛选" value={value} onChange={(event) => setValue(event.target.value)} />;
+}
+
 describe('AnalysisWorkspace', () => {
   it('groups four accessible tabs with real counts and opens the overview by default', async () => {
     const user = userEvent.setup();
@@ -34,22 +40,29 @@ describe('AnalysisWorkspace', () => {
       onDownloadExcel={vi.fn()}
     />);
 
-    expect(screen.getAllByRole('tab').map((tab) => tab.getAttribute('aria-label') ?? tab.textContent)).toEqual(['数据总览', '问题项目', '人工复核', '复盘报告']);
-    expect(screen.getByText('分析', { selector: '.workbench-tab-group-label' })).toBeInTheDocument();
-    expect(screen.getByText('处理', { selector: '.workbench-tab-group-label' })).toBeInTheDocument();
-    expect(screen.getByText('输出', { selector: '.workbench-tab-group-label' })).toBeInTheDocument();
-    expect(within(screen.getByRole('tab', { name: '问题项目' })).getByText('2')).toBeInTheDocument();
-    expect(within(screen.getByRole('tab', { name: '人工复核' })).getByText('1')).toBeInTheDocument();
+    expect(screen.getAllByRole('tab').map((tab) => tab.getAttribute('aria-label'))).toEqual(['数据总览', '问题项目，2 个', '人工复核，1 个', '复盘报告']);
+    const analysisGroup = screen.getByText('分析', { selector: '.workbench-tab-group-label' });
+    const handlingGroup = screen.getByText('处理', { selector: '.workbench-tab-group-label' });
+    const outputGroup = screen.getByText('输出', { selector: '.workbench-tab-group-label' });
+    expect(analysisGroup).toHaveAttribute('id', 'tab-group-analysis');
+    expect(handlingGroup).toHaveAttribute('id', 'tab-group-handling');
+    expect(outputGroup).toHaveAttribute('id', 'tab-group-output');
+    expect(screen.getByRole('tab', { name: '数据总览' })).toHaveAttribute('aria-describedby', analysisGroup.id);
+    expect(screen.getByRole('tab', { name: '问题项目，2 个' })).toHaveAttribute('aria-describedby', analysisGroup.id);
+    expect(screen.getByRole('tab', { name: '人工复核，1 个' })).toHaveAttribute('aria-describedby', handlingGroup.id);
+    expect(screen.getByRole('tab', { name: '复盘报告' })).toHaveAttribute('aria-describedby', outputGroup.id);
+    expect(within(screen.getByRole('tab', { name: '问题项目，2 个' })).getByText('2')).toBeInTheDocument();
+    expect(within(screen.getByRole('tab', { name: '人工复核，1 个' })).getByText('1')).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: '数据总览' })).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByRole('tabpanel', { name: '数据总览' })).toBeVisible();
     expect(screen.queryByText('筛选工具')).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole('tab', { name: '问题项目' }));
-    expect(screen.getByRole('tabpanel', { name: '问题项目' })).toBeVisible();
+    await user.click(screen.getByRole('tab', { name: '问题项目，2 个' }));
+    expect(screen.getByRole('tabpanel', { name: '问题项目，2 个' })).toBeVisible();
     expect(screen.getByText('筛选工具')).toBeInTheDocument();
 
-    await user.click(screen.getByRole('tab', { name: '人工复核' }));
-    expect(screen.getByRole('tabpanel', { name: '人工复核' })).toBeVisible();
+    await user.click(screen.getByRole('tab', { name: '人工复核，1 个' }));
+    expect(screen.getByRole('tabpanel', { name: '人工复核，1 个' })).toBeVisible();
     expect(screen.getByText('筛选工具')).toBeInTheDocument();
   });
 
@@ -67,8 +80,8 @@ describe('AnalysisWorkspace', () => {
       onDownloadExcel={vi.fn()}
     />);
     const overview = screen.getByRole('tab', { name: '数据总览' });
-    const projects = screen.getByRole('tab', { name: '问题项目' });
-    const reviews = screen.getByRole('tab', { name: '人工复核' });
+    const projects = screen.getByRole('tab', { name: '问题项目，2 个' });
+    const reviews = screen.getByRole('tab', { name: '人工复核，1 个' });
     const summary = screen.getByRole('tab', { name: '复盘报告' });
     overview.focus();
 
@@ -161,9 +174,11 @@ describe('AnalysisWorkspace', () => {
       onDownloadExcel={vi.fn()}
     />);
 
-    await user.click(screen.getByRole('tab', { name: '问题项目' }));
+    await user.click(screen.getByRole('tab', { name: '问题项目，1 个' }));
     expect(screen.getByText(/关联项目：B \/ .*销售乙/)).toBeInTheDocument();
     expect(screen.getAllByRole('checkbox', { name: /选择项目/ })).toHaveLength(1);
+    await user.click(screen.getByRole('tab', { name: '人工复核，1 个' }));
+    expect(screen.getByText(/关联项目：B \/ .*销售乙/)).toBeInTheDocument();
   });
 
   it('passes the filtered rows, controlled reviews, and review callback to the manual review view', async () => {
@@ -181,11 +196,33 @@ describe('AnalysisWorkspace', () => {
       onDownloadExcel={vi.fn()}
     />);
 
-    await user.click(screen.getByRole('tab', { name: '人工复核' }));
+    await user.click(screen.getByRole('tab', { name: '人工复核，1 个' }));
     expect(screen.getByText('筛选工具')).toBeInTheDocument();
     expect(screen.queryByText(first.projectName)).not.toBeInTheDocument();
     expect(screen.getByText(second.projectName)).toBeInTheDocument();
     await user.selectOptions(screen.getByRole('combobox', { name: 'B 审查状态' }), '确认业务风险');
     expect(onChangeReview).toHaveBeenCalledWith('second', { status: '确认业务风险' });
+  });
+
+  it('keeps one stateful filter control mounted when switching between processing views', async () => {
+    const user = userEvent.setup();
+    render(<AnalysisWorkspace
+      analysis={analysis}
+      fullCount={2}
+      filters={EMPTY_FILTERS}
+      reviews={{}}
+      filterControls={<StatefulFilter />}
+      summary={createReviewSummary(analysis, {})}
+      onChangeReview={vi.fn()}
+      onDownloadMarkdown={vi.fn()}
+      onDownloadExcel={vi.fn()}
+    />);
+
+    await user.click(screen.getByRole('tab', { name: '问题项目，2 个' }));
+    await user.type(screen.getByRole('textbox', { name: '状态型筛选' }), '华东');
+    await user.click(screen.getByRole('tab', { name: '人工复核，1 个' }));
+
+    expect(screen.getAllByRole('textbox', { name: '状态型筛选' })).toHaveLength(1);
+    expect(screen.getByRole('textbox', { name: '状态型筛选' })).toHaveValue('华东');
   });
 });

@@ -114,13 +114,13 @@ it('restarts the wizard when a same-name file and sheet are uploaded again', asy
   const input = screen.getByLabelText('选择 .xlsx 文件');
   await user.upload(input, new File(['first'], '商机.xlsx'));
   await user.click(await screen.findByRole('button', { name: '开始分析' }));
-  await user.click(screen.getByRole('tab', { name: '问题项目' }));
+  await user.click(screen.getByRole('tab', { name: /^问题项目，\d+ 个$/ }));
   expect(screen.getByText('旧项目')).toBeInTheDocument();
 
   await user.upload(input, new File(['second'], '商机.xlsx'));
   expect(screen.queryByLabelText('经营复盘草稿')).not.toBeInTheDocument();
   await user.click(await screen.findByRole('button', { name: '开始分析' }));
-  await user.click(screen.getByRole('tab', { name: '问题项目' }));
+  await user.click(screen.getByRole('tab', { name: /^问题项目，\d+ 个$/ }));
   expect(screen.getByText('新项目')).toBeInTheDocument();
 });
 
@@ -148,7 +148,7 @@ it('runs a simple workbook through the smart import path', async () => {
   render(<ReviewTool />);
   await user.upload(screen.getByLabelText('选择 .xlsx 文件'), new File(['content'], '商机.xlsx'));
   await user.click(await screen.findByRole('button', { name: '开始分析' }));
-  expect(screen.getAllByRole('tab').map((tab) => tab.getAttribute('aria-label'))).toEqual(['数据总览', '问题项目', '人工复核', '复盘报告']);
+  expect(screen.getAllByRole('tab').map((tab) => tab.getAttribute('aria-label'))).toEqual(['数据总览', '问题项目，0 个', '人工复核，0 个', '复盘报告']);
 });
 
 it('does not create a review status control for objective fact findings', async () => {
@@ -163,7 +163,7 @@ it('does not create a review status control for objective fact findings', async 
   render(<ReviewTool />);
   await user.upload(screen.getByLabelText('选择 .xlsx 文件'), new File(['content'], '商机.xlsx'));
   await user.click(await screen.findByRole('button', { name: '开始分析' }));
-  await user.click(screen.getByRole('tab', { name: '问题项目' }));
+  await user.click(screen.getByRole('tab', { name: /^问题项目，\d+ 个$/ }));
 
   expect(screen.getByText('跟进超期')).toBeInTheDocument();
   expect(screen.queryByLabelText('FACT-1 审查状态')).not.toBeInTheDocument();
@@ -183,7 +183,7 @@ it('keeps review input visible and offers retry when browser storage fails', asy
   render(<ReviewTool />);
   await user.upload(screen.getByLabelText('选择 .xlsx 文件'), new File(['content'], '商机.xlsx'));
   await user.click(await screen.findByRole('button', { name: '开始分析' }));
-  await user.click(screen.getByRole('tab', { name: '问题项目' }));
+  await user.click(screen.getByRole('tab', { name: /^问题项目，\d+ 个$/ }));
   const status = screen.getAllByLabelText('SAVE-1 审查状态')[0];
   await user.selectOptions(status, '确认数据错误');
 
@@ -213,7 +213,7 @@ it('runs the confirmed 30-day rule pack and removes the legacy percentile rule',
   await user.upload(screen.getByLabelText('选择 .xlsx 文件'), new File(['content'], '商机.xlsx'));
   await user.selectOptions(await screen.findByLabelText('金额单位'), '万元');
   await user.click(screen.getByRole('button', { name: '开始分析' }));
-  await user.click(screen.getByRole('tab', { name: '问题项目' }));
+  await user.click(screen.getByRole('tab', { name: /^问题项目，\d+ 个$/ }));
 
   const resultsTable = screen.getByRole('table');
   expect(within(resultsTable).getAllByText('跟进超期')).toHaveLength(1);
@@ -241,7 +241,7 @@ it('projects one global filter across metrics and result areas without changing 
 
   const projectCountMetric = screen.getByText('项目总数').closest('article')!;
   expect(within(projectCountMetric).getByText('2')).toBeInTheDocument();
-  await user.click(screen.getByRole('tab', { name: '问题项目' }));
+  await user.click(screen.getByRole('tab', { name: /^问题项目，\d+ 个$/ }));
   expect(screen.getByText('华东超期项目')).toBeInTheDocument();
   expect(screen.getByText('华南超期项目')).toBeInTheDocument();
 
@@ -307,7 +307,7 @@ it('projects one global filter across metrics and result areas without changing 
   expect(exportedRows).toHaveLength(1);
   expect(exportedRows[0]['项目编码']).toBe('EAST');
 
-  await user.click(screen.getByRole('tab', { name: '问题项目' }));
+  await user.click(screen.getByRole('tab', { name: /^问题项目，\d+ 个$/ }));
   await user.click(screen.getByRole('button', { name: '清除全部筛选' }));
   expect(screen.getAllByText('当前筛选 2 / 全部 2 个项目')).toHaveLength(2);
   expect(screen.getByText('华南超期项目')).toBeInTheDocument();
@@ -347,7 +347,7 @@ it('analyzes an arbitrary Excel workflow and keeps seller filters, findings, met
   expect(screen.getByText('当前筛选 3 / 全部 3 个项目')).toBeInTheDocument();
   expect(within(projectCountMetric).getByText('3')).toBeInTheDocument();
   expect(within(amountMetric).getByText('600 万')).toBeInTheDocument();
-  await user.click(screen.getByRole('tab', { name: '问题项目' }));
+  await user.click(screen.getByRole('tab', { name: /^问题项目，\d+ 个$/ }));
   expect(screen.getByText('甲方超期商机')).toBeInTheDocument();
   expect(screen.getAllByText('跟进超期').length).toBeGreaterThan(0);
 
@@ -355,7 +355,7 @@ it('analyzes an arbitrary Excel workflow and keeps seller filters, findings, met
   expect(screen.getAllByText('当前筛选 1 / 全部 3 个项目')).toHaveLength(2);
   await user.click(screen.getByRole('tab', { name: '复盘报告' }));
   expect(screen.getByText('筛选范围：客户名称：客户甲')).toBeInTheDocument();
-  await user.click(screen.getByRole('tab', { name: '问题项目' }));
+  await user.click(screen.getByRole('tab', { name: /^问题项目，\d+ 个$/ }));
   await user.click(screen.getByRole('button', { name: '清除全部筛选' }));
 
   await user.click(screen.getByRole('checkbox', { name: '销售甲 1个项目' }));
@@ -397,7 +397,7 @@ it('isolates review decisions by confirmed data source instead of file name', as
   await user.upload(input, new File(['first'], '同名项目台账.xlsx'));
   await setSource('客户甲 CRM账套');
   await analyze();
-  await user.click(screen.getByRole('tab', { name: '问题项目' }));
+  await user.click(screen.getByRole('tab', { name: /^问题项目，\d+ 个$/ }));
   const firstReview = screen.getAllByLabelText('SAME-1 审查状态')[0];
   await user.selectOptions(firstReview, '已忽略');
   expect(firstReview).toHaveValue('已忽略');
@@ -405,20 +405,20 @@ it('isolates review decisions by confirmed data source instead of file name', as
   await user.upload(input, new File(['second'], '同名项目台账.xlsx'));
   await setSource('客户乙 CRM账套');
   await analyze();
-  await user.click(screen.getByRole('tab', { name: '问题项目' }));
+  await user.click(screen.getByRole('tab', { name: /^问题项目，\d+ 个$/ }));
   expect(screen.getAllByLabelText('SAME-1 审查状态')[0]).toHaveValue('待复核');
 
   await setSource('客户甲 CRM账套');
   expect(screen.queryByRole('tab', { name: '数据总览' })).not.toBeInTheDocument();
   expect(screen.getByRole('heading', { name: '有 1 项需要确认' })).toBeInTheDocument();
   await analyze();
-  await user.click(screen.getByRole('tab', { name: '问题项目' }));
+  await user.click(screen.getByRole('tab', { name: /^问题项目，\d+ 个$/ }));
   expect(screen.getAllByLabelText('SAME-1 审查状态')[0]).toHaveValue('已忽略');
 
   await user.upload(input, new File(['renamed'], '已改名台账.xlsx'));
   await setSource('客户甲 CRM账套');
   await analyze();
-  await user.click(screen.getByRole('tab', { name: '问题项目' }));
+  await user.click(screen.getByRole('tab', { name: /^问题项目，\d+ 个$/ }));
   expect(screen.getAllByLabelText('SAME-1 审查状态')[0]).toHaveValue('已忽略');
 });
 

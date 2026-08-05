@@ -121,7 +121,7 @@ describe('ManualReviewList', () => {
     const manual = finding('similar-name', 'missing', '名称相似待核验', '需要确认项目身份');
     render(<ManualReviewList
       rows={[row('missing', [manual], {
-        project: makeProject({ sourceKey: 'missing', projectId: '', projectName: '', department: '', salesManager: '' })
+        project: makeProject({ sourceKey: 'missing', projectId: '', projectName: '', customerName: '', department: '', salesManager: '' })
       })]}
       reviews={{}}
       onChangeReview={vi.fn()}
@@ -130,6 +130,7 @@ describe('ManualReviewList', () => {
     const item = screen.getByRole('article');
     expect(within(item).getByText('未填写项目名称')).toBeInTheDocument();
     expect(within(item).getByText('未填写编号')).toBeInTheDocument();
+    expect(within(item).getByText('未填写客户')).toBeInTheDocument();
     expect(within(item).getByText('未填写部门')).toBeInTheDocument();
     expect(within(item).getByText('未填写负责人')).toBeInTheDocument();
     expect(within(item).getByRole('combobox', { name: 'missing 审查状态' })).toBeInTheDocument();

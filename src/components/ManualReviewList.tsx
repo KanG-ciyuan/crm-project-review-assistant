@@ -27,6 +27,7 @@ export function ManualReviewList({ rows, reviews, onChangeReview }: ManualReview
           <header className="manual-review-project">
             <h3>{project.projectName || '未填写项目名称'}</h3>
             <p>{project.projectId || '未填写编号'}</p>
+            <p>{project.customerName || '未填写客户'}</p>
             <p><span>{project.department || '未填写部门'}</span> / <span>{project.salesManager || '未填写负责人'}</span></p>
           </header>
           <div className="manual-review-evidence">
