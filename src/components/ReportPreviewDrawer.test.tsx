@@ -62,6 +62,29 @@ function DrawerHarness() {
   </>;
 }
 
+function UpdatingDrawerHarness() {
+  const [downloaded, setDownloaded] = useState(false);
+  const [closedWith, setClosedWith] = useState('');
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const backgroundRef = useRef<HTMLElement>(null);
+  return <>
+    <main ref={backgroundRef}>工作区内容</main>
+    <button ref={triggerRef}>打开报告预览</button>
+    <ReportPreviewDrawer
+      snapshot={snapshot}
+      stale={false}
+      downloaded={downloaded}
+      downloadError=""
+      onClose={() => setClosedWith(downloaded ? 'updated' : 'initial')}
+      onRegenerate={() => undefined}
+      onDownload={() => setDownloaded(true)}
+      returnFocusRef={triggerRef}
+      backgroundRef={backgroundRef}
+    />
+    <output aria-label="关闭回调版本">{closedWith}</output>
+  </>;
+}
+
 describe('ReportPreviewDrawer', () => {
   it('shows the immutable snapshot and passes that exact object to download', async () => {
     const user = userEvent.setup();
@@ -113,6 +136,23 @@ describe('ReportPreviewDrawer', () => {
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(trigger).toHaveFocus();
+  });
+
+  it('keeps focus and inert stable across parent updates while Escape uses the latest close callback', async () => {
+    const user = userEvent.setup();
+    render(<UpdatingDrawerHarness />);
+    const background = screen.getByText('工作区内容');
+    const trigger = screen.getByRole('button', { name: '打开报告预览' });
+    const download = screen.getByRole('button', { name: '下载 Markdown' });
+
+    await user.click(download);
+
+    expect(download).toHaveFocus();
+    expect(trigger).not.toHaveFocus();
+    expect(background.inert).toBe(true);
+    await user.keyboard('{Escape}');
+    expect(screen.getByText('当前预览已下载')).toHaveAttribute('role', 'status');
+    expect(screen.getByLabelText('关闭回调版本')).toHaveTextContent('updated');
   });
 
   it('makes the background inert only while open', () => {

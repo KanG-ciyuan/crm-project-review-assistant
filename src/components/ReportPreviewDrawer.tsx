@@ -27,6 +27,8 @@ export function ReportPreviewDrawer({
   backgroundRef
 }: ReportPreviewDrawerProps) {
   const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
   useEffect(() => {
     const background = backgroundRef.current;
@@ -37,7 +39,7 @@ export function ReportPreviewDrawer({
     function closeOnEscape(event: KeyboardEvent) {
       if (event.key !== 'Escape') return;
       event.preventDefault();
-      onClose();
+      onCloseRef.current();
     }
 
     document.addEventListener('keydown', closeOnEscape);
@@ -46,7 +48,7 @@ export function ReportPreviewDrawer({
       if (background) background.inert = wasInert;
       returnFocusRef.current?.focus();
     };
-  }, [backgroundRef, onClose, returnFocusRef]);
+  }, []);
 
   return <div className="report-preview-layer">
     <button
