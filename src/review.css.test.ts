@@ -160,5 +160,6 @@ describe('analysis workbench layout styles', () => {
     expect(themeCss).toMatch(/\.app-shell\s*\{[\s\S]*?grid-template-columns:\s*272px/);
     expect(themeCss).toMatch(/\.content\s+h1\s*\{[\s\S]*?font-size:\s*29px/);
     expect(themeCss).toMatch(/\.upload-button\s*\{[\s\S]*?min-height:\s*44px/);
+    expect(themeCss).toMatch(/\.sidebar\s+button:focus-visible,[\s\S]*?outline-color:\s*var\(--focus\)/);
   });
 });

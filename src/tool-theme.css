@@ -195,6 +195,11 @@ body { color: var(--text); background: var(--canvas); }
 .file-state span, .source-namespace small, .rule-note, .sidebar-note { color: var(--muted); font-size: 13px; }
 .source-namespace { color: var(--muted); font-size: 13px; }
 .source-namespace input, .sidebar select, .threshold input { background: #fff; border-color: #b9cbca; color: var(--text); font-size: 14px; min-height: 42px; }
+.sidebar button:focus-visible,
+.sidebar input:focus-visible,
+.sidebar select:focus-visible,
+.sidebar textarea:focus-visible,
+.sidebar a:focus-visible { outline-color: var(--focus); }
 .threshold > span, .threshold em { color: var(--muted); font-size: 13px; }
 .sidebar-note { border-top: 1px solid var(--border); padding-top: 18px; }
 .content { max-width: 1600px; padding: 32px clamp(22px, 3vw, 48px) 44px; width: 100%; }
