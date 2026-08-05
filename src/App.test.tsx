@@ -500,3 +500,40 @@ it('keeps project reviews independent and clears an old report snapshot when a n
   expect(screen.getByRole('dialog')).not.toHaveTextContent('甲项目');
   expect(screen.queryByText('数据已更新，请重新生成预览')).not.toBeInTheDocument();
 });
+
+it('clears an old report snapshot when a refreshed workbook is imported for the same source', async () => {
+  const user = userEvent.setup();
+  const firstWorkbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(firstWorkbook, XLSX.utils.aoa_to_sheet([
+    ['项目编号', '项目名称', '客户名称', '销售经理', '储备金额', '金额单位'],
+    ['OLD-1', '旧项目', '客户甲', '销售甲', 100, '万元'],
+    ['OLD-1', '旧项目副本', '客户甲', '销售甲', 100, '万元']
+  ]), '商机表');
+  const refreshedWorkbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(refreshedWorkbook, XLSX.utils.aoa_to_sheet([
+    ['项目编号', '项目名称', '客户名称', '销售经理', '储备金额', '金额单位'],
+    ['NEW-1', '新项目', '客户乙', '销售乙', 100, '万元'],
+    ['NEW-1', '新项目副本', '客户乙', '销售乙', 100, '万元']
+  ]), '商机表');
+  vi.spyOn(workbookApi, 'inspectWorkbook')
+    .mockResolvedValueOnce({ workbook: firstWorkbook, sheetNames: ['商机表'] })
+    .mockResolvedValueOnce({ workbook: refreshedWorkbook, sheetNames: ['商机表'] });
+
+  render(<ReviewTool />);
+  const input = screen.getByLabelText('选择 .xlsx 文件');
+  await user.upload(input, new File(['first'], '同一账套.xlsx'));
+  await user.click(screen.getByRole('button', { name: '开始分析' }));
+  await user.click(screen.getByRole('tab', { name: '复盘报告' }));
+  await user.click(screen.getByRole('button', { name: '预览完整报告' }));
+  expect(screen.getByRole('dialog')).toHaveTextContent('旧项目');
+  await user.click(screen.getByRole('button', { name: '关闭预览' }));
+
+  await user.upload(input, new File(['refresh'], '同一账套.xlsx'));
+  await user.click(screen.getByRole('button', { name: '开始分析' }));
+  await user.click(screen.getByRole('tab', { name: '复盘报告' }));
+  await user.click(screen.getByRole('button', { name: '预览完整报告' }));
+
+  expect(screen.getByRole('dialog')).toHaveTextContent('新项目');
+  expect(screen.getByRole('dialog')).not.toHaveTextContent('旧项目');
+  expect(screen.queryByText('数据已更新，请重新生成预览')).not.toBeInTheDocument();
+});

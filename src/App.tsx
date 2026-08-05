@@ -142,10 +142,10 @@ export function ReviewTool({ onBack }: { onBack?: () => void }) {
     const reviewKeys = manualReviewKeys(nextFindings);
     const nextReviews = reconcileReviewRecords(result.rows, reviewKeys, reviewRecords, now);
     persistReviews(nextReviews);
-    if (activeSourceNamespace && activeSourceNamespace !== confirmedSourceNamespace) {
-      setReportSnapshot(null);
-      setReportPreviewOpen(false);
-    }
+    setReportSnapshot(null);
+    setReportPreviewOpen(false);
+    setReportDownloaded(false);
+    setReportDownloadError('');
     setActiveSourceNamespace(confirmedSourceNamespace);
     setAnalysis(result);
     setFilters(EMPTY_FILTERS);
