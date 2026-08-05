@@ -259,6 +259,45 @@ describe('createReviewSummary', () => {
       '围绕问题项目较集中的部门和负责人，安排下一轮经营跟进。'
     ]);
   });
+
+  it('keeps long departments and managers distinct when their bounded labels collide', () => {
+    const sharedDepartmentPrefix = '部门'.repeat(45);
+    const sharedManagerPrefix = '负责人'.repeat(30);
+    const departmentA = `${sharedDepartmentPrefix}A`;
+    const departmentB = `${sharedDepartmentPrefix}B`;
+    const managerA = `${sharedManagerPrefix}A`;
+    const managerB = `${sharedManagerPrefix}B`;
+    const first = makeProject({
+      sourceKey: 'collision-a', projectId: 'COLLISION-A', department: departmentA, salesManager: managerA, amount: 100
+    });
+    const second = makeProject({
+      sourceKey: 'collision-b', projectId: 'COLLISION-B', department: departmentB, salesManager: managerB, amount: 100
+    });
+    const summary = createReviewSummary(buildAnalysis([second, first], [
+      finding(first, 'follow-up-overdue', 'action', 'A问题', '证据 A', '维护超期待整改'),
+      finding(second, 'follow-up-overdue', 'action', 'B问题', '证据 B', '维护超期待整改')
+    ], reportDate), {});
+
+    expect(summary.departmentActions).toHaveLength(2);
+    expect(summary.departmentActions.map((item) => item.mainIssue)).toEqual(['A问题', 'B问题']);
+    expect(new Set(summary.departmentActions.map((item) => item.department))).toHaveLength(1);
+    expect(summary.focusScopes.filter((item) => item.type === '部门')).toHaveLength(2);
+    expect(summary.focusScopes.filter((item) => item.type === '负责人')).toHaveLength(2);
+  });
+
+  it('truncates display fields by Unicode code points without splitting a surrogate pair', () => {
+    const project = makeProject({
+      sourceKey: 'unicode-boundary', projectId: 'UNICODE',
+      projectName: `${'甲'.repeat(78)}😀尾巴`
+    });
+    const summary = createReviewSummary(buildAnalysis([project], [finding(
+      project, 'follow-up-overdue', 'action', '跟进超期', '客观证据', '维护超期待整改'
+    )], reportDate), {});
+    const displayedName = summary.priorityProjects[0].projectName;
+
+    expect(displayedName).toBe(`${'甲'.repeat(78)}😀…`);
+    expect(Array.from(displayedName)).toHaveLength(80);
+  });
 });
 
 describe('createReviewReport', () => {

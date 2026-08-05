@@ -114,9 +114,11 @@ const formatAmount = (value: number) => value.toLocaleString('zh-CN', { maximumF
 
 function truncateDisplay(value: string, maxLength: number): string {
   const normalized = normalizedInline(value);
-  return normalized.length <= maxLength ? normalized : `${normalized.slice(0, maxLength - 1)}…`;
+  const codePoints = Array.from(normalized);
+  return codePoints.length <= maxLength ? normalized : `${codePoints.slice(0, maxLength - 1).join('')}…`;
 }
 
+const normalizedValue = (value: string, missing: string) => normalizedInline(value) || missing;
 const displayValue = (value: string, missing: string, maxLength = MAX_IDENTITY_LENGTH) =>
   truncateDisplay(value, maxLength) || missing;
 
@@ -220,7 +222,7 @@ function categoryCounts(analysis: AnalysisResult): ReviewSummaryItem[] {
 function legacyPriorityIssues(analysis: AnalysisResult): ReviewSummaryItem[] {
   const projectsByLabel = new Map<string, Set<string>>();
   analysis.findings.forEach((finding) => {
-    const label = displayValue(finding.label, '未命名问题');
+    const label = normalizedValue(finding.label, '未命名问题');
     const projects = projectsByLabel.get(label) ?? new Set<string>();
     projects.add(finding.rowKey);
     projectsByLabel.set(label, projects);
@@ -228,14 +230,15 @@ function legacyPriorityIssues(analysis: AnalysisResult): ReviewSummaryItem[] {
   return [...projectsByLabel.entries()]
     .map(([label, projects]) => ({ label, projectCount: projects.size }))
     .sort((left, right) => right.projectCount - left.projectCount || left.label.localeCompare(right.label, 'zh-CN'))
-    .slice(0, 4);
+    .slice(0, 4)
+    .map((item) => ({ ...item, label: displayValue(item.label, '未命名问题') }));
 }
 
 function legacyFocusScopes(rows: ProjectWorkbenchRow[]): ReviewFocusScope[] {
   const scopes = new Map<string, { type: ReviewFocusScope['type']; name: string; projects: Set<string> }>();
   rows.filter((row) => row.manualFindings.length > 0 || row.factFindings.length > 0).forEach((row) => {
     ([['部门', row.project.department], ['负责人', row.project.salesManager]] as const).forEach(([type, rawName]) => {
-      const name = displayValue(rawName, '未填写');
+      const name = normalizedValue(rawName, '未填写');
       const key = `${type}:${name}`;
       const scope = scopes.get(key) ?? { type, name, projects: new Set<string>() };
       scope.projects.add(row.rowKey);
@@ -246,7 +249,8 @@ function legacyFocusScopes(rows: ProjectWorkbenchRow[]): ReviewFocusScope[] {
     .map((scope) => ({ type: scope.type, name: scope.name, projectCount: scope.projects.size }))
     .sort((left, right) => right.projectCount - left.projectCount
       || `${left.type}：${left.name}`.localeCompare(`${right.type}：${right.name}`, 'zh-CN'))
-    .slice(0, 5);
+    .slice(0, 5)
+    .map((scope) => ({ ...scope, name: displayValue(scope.name, '未填写') }));
 }
 
 function legacyActions(counts: Record<ReviewStatus, number>): string[] {
@@ -275,7 +279,8 @@ function departmentActions(
   const groups = new Map<string, Array<{ row: ProjectWorkbenchRow; item: ManagementProjectItem }>>();
   rows.forEach((row) => {
     const item = itemsByKey.get(row.rowKey)!;
-    groups.set(item.department, [...(groups.get(item.department) ?? []), { row, item }]);
+    const department = normalizedValue(row.project.department, '部门未填写');
+    groups.set(department, [...(groups.get(department) ?? []), { row, item }]);
   });
   return [...groups.entries()].map(([department, entries]) => {
     const projects = entries.map(({ item }) => item);
@@ -286,7 +291,7 @@ function departmentActions(
     const issueCounts = new Map<string, number>();
     entries.forEach(({ row }) => {
       const labels = new Set([...row.manualFindings, ...row.factFindings]
-        .map((finding) => displayValue(finding.label, '未命名规则')));
+        .map((finding) => normalizedValue(finding.label, '未命名规则')));
       labels.forEach((label) => issueCounts.set(label, (issueCounts.get(label) ?? 0) + 1));
     });
     const mainIssue = [...issueCounts.entries()]
@@ -298,18 +303,20 @@ function departmentActions(
         ? '责任团队确认真实原因并补充复核结论。'
         : dataErrorCount > 0 ? '修正 CRM 源数据后重新导入验证。' : '核实规则证据并更新 CRM。';
     return {
-      department,
+      department: displayValue(department, '部门未填写'),
       projectCount: projects.length,
       amountWan: projects.reduce((sum, item) => sum + (item.amountWan ?? 0), 0),
-      mainIssue,
+      mainIssue: displayValue(mainIssue, '规则证据待补充'),
       suggestedAction,
       reviewedCount: riskCount + dataErrorCount,
-      pendingCount
+      pendingCount,
+      sortDepartment: department
     };
   }).sort((left, right) => right.projectCount - left.projectCount
     || right.amountWan - left.amountWan
-    || left.department.localeCompare(right.department, 'zh-CN'))
-    .slice(0, MAX_DEPARTMENT_ACTIONS);
+    || left.sortDepartment.localeCompare(right.sortDepartment, 'zh-CN'))
+    .slice(0, MAX_DEPARTMENT_ACTIONS)
+    .map(({ sortDepartment: _sortDepartment, ...item }) => item);
 }
 
 export function createReviewSummary(
