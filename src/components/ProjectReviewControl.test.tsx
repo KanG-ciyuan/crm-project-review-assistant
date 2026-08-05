@@ -47,10 +47,10 @@ describe('ProjectReviewControl', () => {
     expect(onChange.mock.calls.every(([, patch]) => Object.keys(patch).length === 1)).toBe(true);
   });
 
-  it('keeps two project controls isolated and gives them unique field ids', () => {
+  it('keeps ids unique for two mounted controls with the same row key and binds each label to its own field', () => {
     render(<>
-      <ProjectReviewControl rowKey="row-a" projectLabel="项目A" review={makeReview({ status: '确认数据错误', note: 'A说明' })} onChange={vi.fn()} />
-      <ProjectReviewControl rowKey="row-b" projectLabel="项目B" review={makeReview({ status: '已忽略', note: 'B说明' })} onChange={vi.fn()} />
+      <ProjectReviewControl rowKey="shared-row" projectLabel="项目A" review={makeReview({ status: '确认数据错误', note: 'A说明' })} onChange={vi.fn()} />
+      <ProjectReviewControl rowKey="shared-row" projectLabel="项目B" review={makeReview({ status: '已忽略', note: 'B说明' })} onChange={vi.fn()} />
     </>);
 
     const aStatus = screen.getByRole('combobox', { name: '项目A 审查状态' });
@@ -62,6 +62,32 @@ describe('ProjectReviewControl', () => {
     expect(bStatus).toHaveValue('已忽略');
     expect(bNote).toHaveValue('B说明');
     expect(new Set([aStatus.id, bStatus.id, aNote.id, bNote.id])).toHaveProperty('size', 4);
+    expect(screen.getByText('项目A 审查状态', { selector: 'label' })).toHaveAttribute('for', aStatus.id);
+    expect(screen.getByText('项目A 处理说明', { selector: 'label' })).toHaveAttribute('for', aNote.id);
+    expect(screen.getByText('项目B 审查状态', { selector: 'label' })).toHaveAttribute('for', bStatus.id);
+    expect(screen.getByText('项目B 处理说明', { selector: 'label' })).toHaveAttribute('for', bNote.id);
+    expect(document.getElementById(aStatus.id)).toBe(aStatus);
+    expect(document.getElementById(bStatus.id)).toBe(bStatus);
+  });
+
+  it('does not collide when row keys are empty and the literal word empty', () => {
+    render(<>
+      <ProjectReviewControl rowKey="" projectLabel="空键项目" review={undefined} onChange={vi.fn()} />
+      <ProjectReviewControl rowKey="empty" projectLabel="字面项目" review={undefined} onChange={vi.fn()} />
+    </>);
+
+    const ids = [
+      screen.getByRole('combobox', { name: '空键项目 审查状态' }).id,
+      screen.getByRole('textbox', { name: '空键项目 处理说明' }).id,
+      screen.getByRole('combobox', { name: '字面项目 审查状态' }).id,
+      screen.getByRole('textbox', { name: '字面项目 处理说明' }).id
+    ];
+    expect(new Set(ids)).toHaveProperty('size', 4);
+  });
+
+  it('renders a lone-surrogate row key without throwing', () => {
+    expect(() => render(<ProjectReviewControl rowKey={'\uD800'} projectLabel="异常键项目" review={undefined} onChange={vi.fn()} />)).not.toThrow();
+    expect(screen.getByRole('combobox', { name: '异常键项目 审查状态' })).toBeInTheDocument();
   });
 
   it('immediately reflects a different project after rerender without retaining prior values', () => {

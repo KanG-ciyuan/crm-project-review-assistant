@@ -1,3 +1,4 @@
+import { useId } from 'react';
 import { REVIEW_STATUSES, type ReviewRecord, type ReviewStatus } from '../domain/review';
 
 interface ProjectReviewControlProps {
@@ -8,9 +9,9 @@ interface ProjectReviewControlProps {
 }
 
 export function ProjectReviewControl({ rowKey, projectLabel, review, onChange }: ProjectReviewControlProps) {
-  const idKey = encodeURIComponent(rowKey) || 'empty';
-  const statusId = `review-${idKey}`;
-  const noteId = `note-${idKey}`;
+  const id = useId();
+  const statusId = `review-${id}`;
+  const noteId = `note-${id}`;
   const latestHistory = review?.history[review.history.length - 1];
 
   return <div className="review-control">
