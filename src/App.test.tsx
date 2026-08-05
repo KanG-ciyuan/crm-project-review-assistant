@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, expect, it, vi } from 'vitest';
 import * as XLSX from 'xlsx';
@@ -6,10 +6,12 @@ import App, { ReviewTool } from './App';
 import { formatLocalDate } from './domain/report';
 import { loadReviewRecords, reconcileReviewRecords, saveReviewRecords, updateReviewRecord } from './domain/review';
 import * as workbookApi from './lib/workbook';
+import type { WorkbookInspection } from './lib/workbook';
 import { makeProject } from './test/fixtures';
 
 afterEach(() => {
   cleanup();
+  window.localStorage.clear();
   vi.useRealTimers();
   vi.restoreAllMocks();
 });
@@ -93,6 +95,35 @@ it('opens smart confirmation for an arbitrary worksheet instead of requiring fix
   expect(screen.queryByText('缺少必填字段')).not.toBeInTheDocument();
 });
 
+it('keeps the latest selected workbook when an earlier asynchronous inspection finishes later', async () => {
+  const user = userEvent.setup();
+  const firstWorkbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(firstWorkbook, XLSX.utils.aoa_to_sheet([['项目名称'], ['A 项目']]), 'A表');
+  const secondWorkbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(secondWorkbook, XLSX.utils.aoa_to_sheet([['项目名称'], ['B 项目']]), 'B表');
+  let resolveFirst!: (inspection: WorkbookInspection) => void;
+  let resolveSecond!: (inspection: WorkbookInspection) => void;
+  const firstInspection = new Promise<WorkbookInspection>((resolve) => { resolveFirst = resolve; });
+  const secondInspection = new Promise<WorkbookInspection>((resolve) => { resolveSecond = resolve; });
+  vi.spyOn(workbookApi, 'inspectWorkbook')
+    .mockReturnValueOnce(firstInspection)
+    .mockReturnValueOnce(secondInspection);
+
+  render(<ReviewTool />);
+  const input = screen.getByLabelText('选择 .xlsx 文件');
+  await user.upload(input, new File(['A'], 'A.xlsx'));
+  await user.upload(input, new File(['B'], 'B.xlsx'));
+  await act(async () => { resolveSecond({ workbook: secondWorkbook, sheetNames: ['B表'] }); });
+
+  expect(await screen.findByRole('option', { name: 'B表' })).toBeInTheDocument();
+  expect(screen.getByText('B.xlsx')).toBeInTheDocument();
+  await act(async () => { resolveFirst({ workbook: firstWorkbook, sheetNames: ['A表'] }); });
+
+  expect(screen.getByRole('option', { name: 'B表' })).toBeInTheDocument();
+  expect(screen.getByText('B.xlsx')).toBeInTheDocument();
+  expect(screen.queryByRole('option', { name: 'A表' })).not.toBeInTheDocument();
+});
+
 it('restarts the wizard when a same-name file and sheet are uploaded again', async () => {
   const user = userEvent.setup();
   const firstWorkbook = XLSX.utils.book_new();
@@ -167,6 +198,27 @@ it('does not create a review status control for objective fact findings', async 
 
   expect(screen.getByText('跟进超期')).toBeInTheDocument();
   expect(screen.queryByLabelText('FACT-1 审查状态')).not.toBeInTheDocument();
+});
+
+it('shows a retryable error when the report download cannot create an object URL', async () => {
+  const user = userEvent.setup();
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([
+    ['项目编号', '项目名称', '销售经理', '储备金额', '金额单位'],
+    ['DOWNLOAD-1', '下载失败项目', '销售甲', 100, '万元'],
+    ['DOWNLOAD-1', '下载失败项目副本', '销售甲', 100, '万元']
+  ]), '商机表');
+  vi.spyOn(workbookApi, 'inspectWorkbook').mockResolvedValue({ workbook, sheetNames: ['商机表'] });
+  vi.spyOn(URL, 'createObjectURL').mockImplementation(() => { throw new Error('blocked'); });
+
+  render(<ReviewTool />);
+  await user.upload(screen.getByLabelText('选择 .xlsx 文件'), new File(['content'], '下载失败.xlsx'));
+  await user.click(screen.getByRole('button', { name: '开始分析' }));
+  await user.click(screen.getByRole('tab', { name: '复盘报告' }));
+  await user.click(screen.getByRole('button', { name: '预览完整报告' }));
+  await user.click(screen.getByRole('button', { name: '下载 Markdown' }));
+
+  expect(screen.getByRole('alert')).toHaveTextContent('报告下载失败，请重试。');
 });
 
 it('keeps review input visible and offers retry when browser storage fails', async () => {

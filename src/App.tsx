@@ -67,6 +67,7 @@ export function ReviewTool({ onBack }: { onBack?: () => void }) {
   const [activeSourceNamespace, setActiveSourceNamespace] = useState('');
   const appShellRef = useRef<HTMLDivElement>(null);
   const reportPreviewTriggerRef = useRef<HTMLButtonElement>(null);
+  const fileRequestSequence = useRef(0);
 
   const sheetInspection = useMemo(() => inspection && sheetName ? inspectSheet(inspection.workbook, sheetName) : null, [inspection, sheetName]);
   const selectedKeys = useMemo(
@@ -106,6 +107,7 @@ export function ReviewTool({ onBack }: { onBack?: () => void }) {
   }
 
   async function onFileChange(file: File | null) {
+    const requestSequence = ++fileRequestSequence.current;
     if (!file) return;
     try {
       setError('');
@@ -114,12 +116,14 @@ export function ReviewTool({ onBack }: { onBack?: () => void }) {
       setImportReady(null);
       setSourceNamespace('');
       const next = await inspectWorkbook(file);
+      if (requestSequence !== fileRequestSequence.current) return;
       setImportRevision((current) => current + 1);
       setInspection(next);
       setSheetName(next.sheetNames[0]);
       setFileName(file.name);
       setSourceNamespace(suggestedSourceNamespace(file.name));
     } catch (caught) {
+      if (requestSequence !== fileRequestSequence.current) return;
       setInspection(null);
       setFilters(EMPTY_FILTERS);
       setImportReady(null);
