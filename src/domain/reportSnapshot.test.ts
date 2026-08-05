@@ -52,6 +52,16 @@ describe('createReportSnapshot', () => {
     expect(first.markdown).toBe(markdown);
     expect(first.sourceSignature).toBe(sourceSignature);
   });
+
+  it('freezes the snapshot so captured values cannot be changed at runtime', () => {
+    const snapshot = createReportSnapshot('# 原始内容', 'source:original', new Date(2026, 6, 21));
+
+    expect(Object.isFrozen(snapshot)).toBe(true);
+    expect(Reflect.set(snapshot, 'markdown', '# 已篡改')).toBe(false);
+    expect(Reflect.set(snapshot, 'sourceSignature', 'source:changed')).toBe(false);
+    expect(snapshot.markdown).toBe('# 原始内容');
+    expect(snapshot.sourceSignature).toBe('source:original');
+  });
 });
 
 describe('isReportSnapshotStale', () => {

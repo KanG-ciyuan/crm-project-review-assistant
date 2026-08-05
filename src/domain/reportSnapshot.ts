@@ -1,10 +1,10 @@
 import { formatLocalDate } from './report';
 
 export interface ReportPreviewSnapshot {
-  markdown: string;
-  fileName: string;
-  generatedAt: string;
-  sourceSignature: string;
+  readonly markdown: string;
+  readonly fileName: string;
+  readonly generatedAt: string;
+  readonly sourceSignature: string;
 }
 
 export function createReportSnapshot(
@@ -12,12 +12,14 @@ export function createReportSnapshot(
   sourceSignature: string,
   now: Date
 ): ReportPreviewSnapshot {
-  return {
+  const snapshot: ReportPreviewSnapshot = {
     markdown,
     fileName: `储备项目经营复盘-${formatLocalDate(now)}-当前筛选.md`,
     generatedAt: now.toISOString(),
     sourceSignature
   };
+
+  return Object.freeze(snapshot);
 }
 
 export function isReportSnapshotStale(
