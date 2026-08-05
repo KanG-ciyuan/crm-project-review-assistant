@@ -106,8 +106,19 @@ const categoryLabels: Record<FindingCategory, string> = {
 const reviewStatuses: ReviewStatus[] = ['待复核', '确认数据错误', '确认业务风险', '已忽略'];
 // Management reports show only the highest-impact departments; all project evidence remains in priority/appendix models.
 const MAX_DEPARTMENT_ACTIONS = 10;
+const MAX_IDENTITY_LENGTH = 80;
+const MAX_EVIDENCE_LENGTH = 160;
+const MAX_EVIDENCE_ITEMS = 2;
+const MAX_REVIEW_TEXT_LENGTH = 160;
 const formatAmount = (value: number) => value.toLocaleString('zh-CN', { maximumFractionDigits: 2 });
-const safeValue = (value: string, missing: string) => safeMarkdownInline(value) || missing;
+
+function truncateDisplay(value: string, maxLength: number): string {
+  const normalized = normalizedInline(value);
+  return normalized.length <= maxLength ? normalized : `${normalized.slice(0, maxLength - 1)}…`;
+}
+
+const displayValue = (value: string, missing: string, maxLength = MAX_IDENTITY_LENGTH) =>
+  truncateDisplay(value, maxLength) || missing;
 
 function generatedDate(analysis: AnalysisResult): string {
   const date = new Date(analysis.generatedAt);
@@ -122,7 +133,7 @@ function reviewStatusFor(row: ProjectWorkbenchRow, reviews: ReviewRecordMap): Ma
 function reviewConclusion(status: ManagementProjectItem['reviewStatus'], note: string): string {
   if (status === '待复核') return '待业务确认';
   if (status === '无需人工复核') return '无需人工复核';
-  const confirmedNote = safeMarkdownInline(note);
+  const confirmedNote = truncateDisplay(note, MAX_REVIEW_TEXT_LENGTH);
   if (confirmedNote) return confirmedNote;
   if (status === '确认业务风险') return '业务风险已确认，具体原因未填写';
   if (status === '确认数据错误') return '数据错误已确认，具体说明未填写';
@@ -160,24 +171,26 @@ function decisionContent(status: ManagementProjectItem['reviewStatus']): Pick<Ma
 function managementItem(row: ProjectWorkbenchRow, reviews: ReviewRecordMap): ManagementProjectItem {
   const status = reviewStatusFor(row, reviews);
   const evidence = [...new Set([...row.manualFindings, ...row.factFindings].map((finding) => {
-    const label = safeValue(finding.label, '未命名规则');
-    const reason = safeMarkdownInline(finding.reason);
-    return reason ? `${label}：${reason}` : label;
-  }))];
+    const label = displayValue(finding.label, '未命名规则');
+    const reason = truncateDisplay(finding.reason, MAX_EVIDENCE_LENGTH);
+    return truncateDisplay(reason ? `${label}：${reason}` : label, MAX_EVIDENCE_LENGTH);
+  }))].slice(0, MAX_EVIDENCE_ITEMS);
+  const content = decisionContent(status);
   return {
     rowKey: row.rowKey,
-    projectId: safeValue(row.project.projectId, '项目编号未填写'),
-    projectName: safeValue(row.project.projectName, '项目名称未填写'),
-    amountWan: amountInWan(row.project),
+    projectId: displayValue(row.project.projectId, '项目编号未填写'),
+    projectName: displayValue(row.project.projectName, '项目名称未填写'),
+    amountWan: row.project.amountParseError ? null : amountInWan(row.project),
     stage: !row.project.status || row.project.status === '未知'
       ? '项目阶段未填写'
-      : safeMarkdownInline(row.project.status),
-    department: safeValue(row.project.department, '部门未填写'),
-    salesManager: safeValue(row.project.salesManager, '负责人未填写'),
+      : displayValue(row.project.status, '项目阶段未填写'),
+    department: displayValue(row.project.department, '部门未填写'),
+    salesManager: displayValue(row.project.salesManager, '负责人未填写'),
     evidence: evidence.length > 0 ? evidence : ['规则证据待补充'],
     reviewStatus: status,
     reviewConclusion: reviewConclusion(status, reviews[row.rowKey]?.note ?? ''),
-    ...decisionContent(status)
+    decisionQuestion: truncateDisplay(content.decisionQuestion, MAX_REVIEW_TEXT_LENGTH),
+    suggestedAction: truncateDisplay(content.suggestedAction, MAX_REVIEW_TEXT_LENGTH)
   };
 }
 
@@ -207,7 +220,7 @@ function categoryCounts(analysis: AnalysisResult): ReviewSummaryItem[] {
 function legacyPriorityIssues(analysis: AnalysisResult): ReviewSummaryItem[] {
   const projectsByLabel = new Map<string, Set<string>>();
   analysis.findings.forEach((finding) => {
-    const label = safeValue(finding.label, '未命名问题');
+    const label = displayValue(finding.label, '未命名问题');
     const projects = projectsByLabel.get(label) ?? new Set<string>();
     projects.add(finding.rowKey);
     projectsByLabel.set(label, projects);
@@ -216,6 +229,36 @@ function legacyPriorityIssues(analysis: AnalysisResult): ReviewSummaryItem[] {
     .map(([label, projects]) => ({ label, projectCount: projects.size }))
     .sort((left, right) => right.projectCount - left.projectCount || left.label.localeCompare(right.label, 'zh-CN'))
     .slice(0, 4);
+}
+
+function legacyFocusScopes(rows: ProjectWorkbenchRow[]): ReviewFocusScope[] {
+  const scopes = new Map<string, { type: ReviewFocusScope['type']; name: string; projects: Set<string> }>();
+  rows.filter((row) => row.manualFindings.length > 0 || row.factFindings.length > 0).forEach((row) => {
+    ([['部门', row.project.department], ['负责人', row.project.salesManager]] as const).forEach(([type, rawName]) => {
+      const name = displayValue(rawName, '未填写');
+      const key = `${type}:${name}`;
+      const scope = scopes.get(key) ?? { type, name, projects: new Set<string>() };
+      scope.projects.add(row.rowKey);
+      scopes.set(key, scope);
+    });
+  });
+  return [...scopes.values()]
+    .map((scope) => ({ type: scope.type, name: scope.name, projectCount: scope.projects.size }))
+    .sort((left, right) => right.projectCount - left.projectCount
+      || `${left.type}：${left.name}`.localeCompare(`${right.type}：${right.name}`, 'zh-CN'))
+    .slice(0, 5);
+}
+
+function legacyActions(counts: Record<ReviewStatus, number>): string[] {
+  return [
+    counts['待复核'] > 0
+      ? `优先复核 ${counts['待复核']} 个待复核项目，确认数据错误或业务风险。`
+      : '持续抽查规则发现，保持数据质量。',
+    counts['确认数据错误'] > 0
+      ? `修正已确认的 ${counts['确认数据错误']} 个数据错误，并重新分析验证。`
+      : '对关键字段和日期保持定期校验。',
+    '围绕问题项目较集中的部门和负责人，安排下一轮经营跟进。'
+  ];
 }
 
 function reviewCounts(rows: ProjectWorkbenchRow[], reviews: ReviewRecordMap): Record<ReviewStatus, number> {
@@ -243,7 +286,7 @@ function departmentActions(
     const issueCounts = new Map<string, number>();
     entries.forEach(({ row }) => {
       const labels = new Set([...row.manualFindings, ...row.factFindings]
-        .map((finding) => safeValue(finding.label, '未命名规则')));
+        .map((finding) => displayValue(finding.label, '未命名规则')));
       labels.forEach((label) => issueCounts.set(label, (issueCounts.get(label) ?? 0) + 1));
     });
     const mainIssue = [...issueCounts.entries()]
@@ -284,7 +327,7 @@ export function createReviewSummary(
     .sort((left, right) => decisionRank(left.reviewStatus) - decisionRank(right.reviewStatus)
       || compareAmountAndIdentity(left, right));
   const ignoredKeys = new Set(workbenchRows
-    .filter((row) => reviews[row.rowKey]?.status === '已忽略')
+    .filter((row) => row.manualFindings.length > 0 && reviews[row.rowKey]?.status === '已忽略')
     .map((row) => row.rowKey));
   const eligibleRows = workbenchRows.filter((row) => !ignoredKeys.has(row.rowKey)
     && (row.manualFindings.length > 0 || row.factFindings.length > 0));
@@ -315,11 +358,11 @@ export function createReviewSummary(
 
   return {
     meta: {
-      title: '储备项目经营复盘',
+      title: '储备项目经营复盘报告',
       generatedDate: generatedDate(analysis),
       disclaimer: '本报告基于本地导入数据和确定性规则生成；规则提供客观证据，真实原因和业务结论须由业务人员确认。'
     },
-    scope: filterScope.map(safeMarkdownInline).filter(Boolean),
+    scope: filterScope.map((item) => truncateDisplay(item, MAX_IDENTITY_LENGTH)).filter(Boolean),
     executiveConclusions,
     decisionItems,
     priorityProjects,
@@ -333,30 +376,27 @@ export function createReviewSummary(
     },
     overallConclusions: executiveConclusions,
     priorityIssues: legacyPriorityIssues(analysis),
-    focusScopes: actionsByDepartment.slice(0, 5).map((item) => ({
-      type: '部门' as const,
-      name: item.department,
-      projectCount: item.projectCount
-    })),
+    focusScopes: legacyFocusScopes(workbenchRows),
     ruleDistribution: { categories, reviewStatuses: statusDistribution },
-    actions: actionsByDepartment.slice(0, 3).map((item) => item.suggestedAction)
+    actions: legacyActions(counts)
   };
 }
 
-const amountText = (amountWan: number | null) => amountWan === null ? '金额未填写' : formatAmount(amountWan);
-const amountDetail = (amountWan: number | null) => amountWan === null ? '金额未填写' : `金额 ${formatAmount(amountWan)} 万元`;
+const amountText = (amountWan: number | null) => amountWan === null ? '金额待确认' : `${formatAmount(amountWan)} 万元`;
+const amountDetail = (amountWan: number | null) => amountWan === null ? '金额待确认' : `金额 ${formatAmount(amountWan)} 万元`;
+const markdown = (value: string) => safeMarkdownInline(value);
 
 function decisionBlocks(summary: ReviewSummaryData): string {
   const priorityKeys = new Set(summary.priorityProjects.map((item) => item.rowKey));
   const visible = summary.decisionItems.filter((item) => priorityKeys.has(item.rowKey));
   if (visible.length === 0) return '本期没有需要管理层决策的项目。';
   const blocks = visible.map((item, index) => [
-    `### 决策项目 ${index + 1}：${item.projectId} ${item.projectName}`,
-    `- 基本信息：${amountDetail(item.amountWan)}；阶段 ${item.stage}；部门 ${item.department}；负责人 ${item.salesManager}。`,
-    `- 规则证据：${item.evidence.join('；')}。`,
-    `- 复核状态：${item.reviewStatus}；人工结论：${item.reviewConclusion}。`,
-    `- 决策问题：${item.decisionQuestion}`,
-    `- 建议动作：${item.suggestedAction}`
+    `### 决策项目 ${index + 1}：${markdown(item.projectId)} ${markdown(item.projectName)}`,
+    `- 基本信息：${amountDetail(item.amountWan)}；阶段 ${markdown(item.stage)}；部门 ${markdown(item.department)}；负责人 ${markdown(item.salesManager)}。`,
+    `- 规则证据：${item.evidence.map(markdown).join('；')}。`,
+    `- 复核状态：${item.reviewStatus}；人工结论：${markdown(item.reviewConclusion)}。`,
+    `- 决策问题：${markdown(item.decisionQuestion)}`,
+    `- 建议动作：${markdown(item.suggestedAction)}`
   ].join('\n'));
   const hiddenCount = summary.decisionItems.length - visible.length;
   if (hiddenCount > 0) blocks.push(`其余 ${hiddenCount} 个决策项目计入附录剩余项目统计。`);
@@ -366,18 +406,19 @@ function decisionBlocks(summary: ReviewSummaryData): string {
 function projectTable(projects: ManagementProjectItem[]): string {
   if (projects.length === 0) return '本期没有重点处理项目。';
   return [
-    '| 项目 | 金额（万元） | 阶段 | 部门 | 负责人 | 证据与结论 | 建议动作 |',
+    '| 项目 | 金额 | 当前阶段 | 发现的问题 | 人工复核结论 | 建议动作 | 责任部门 / 负责人 |',
     '| --- | ---: | --- | --- | --- | --- | --- |',
     ...projects.map((item) => {
-      const evidence = `${item.evidence.join('；')}；${item.reviewConclusion}`;
-      return `| ${item.projectId} ${item.projectName} | ${amountText(item.amountWan)} | ${item.stage} | ${item.department} | ${item.salesManager} | ${evidence} | ${item.suggestedAction} |`;
+      const project = `${markdown(item.projectId)} ${markdown(item.projectName)}`;
+      const owner = `${markdown(item.department)} / ${markdown(item.salesManager)}`;
+      return `| ${project} | ${amountText(item.amountWan)} | ${markdown(item.stage)} | ${item.evidence.map(markdown).join('；')} | ${markdown(item.reviewConclusion)} | ${markdown(item.suggestedAction)} | ${owner} |`;
     })
   ].join('\n');
 }
 
 function departmentList(items: DepartmentActionItem[]): string {
   if (items.length === 0) return '本期没有需要安排后续动作的部门。';
-  return items.map((item) => `- ${item.department}：${item.projectCount} 个项目，金额 ${formatAmount(item.amountWan)} 万元；主要问题：${item.mainIssue}；已复核 ${item.reviewedCount} 个，待复核 ${item.pendingCount} 个；后续安排：${item.suggestedAction}`).join('\n');
+  return items.map((item) => `- ${markdown(item.department)}：${item.projectCount} 个项目，金额 ${formatAmount(item.amountWan)} 万元；主要问题：${markdown(item.mainIssue)}；已复核 ${item.reviewedCount} 个，待复核 ${item.pendingCount} 个；后续安排：${markdown(item.suggestedAction)}`).join('\n');
 }
 
 export function createReviewReport(
@@ -391,13 +432,13 @@ export function createReviewReport(
     ...generated,
     meta: { ...generated.meta, generatedDate: formatLocalDate(today) }
   };
-  const scope = summary.scope.length > 0 ? summary.scope.join('；') : '全部导入项目';
+  const scope = summary.scope.length > 0 ? summary.scope.map(markdown).join('；') : '全部导入项目';
   const categories = summary.appendix.categories.length > 0
     ? summary.appendix.categories.map((item) => `${item.label} ${item.projectCount} 个项目`).join('；')
     : '本期没有规则发现。';
   const statuses = summary.appendix.reviewStatuses.map((item) => `${item.status} ${item.count} 个`).join('；');
   const priorityIssues = summary.priorityIssues.length > 0
-    ? summary.priorityIssues.map((item) => `${item.label}：涉及 ${item.projectCount} 个项目`).join('；')
+    ? summary.priorityIssues.map((item) => `${markdown(item.label)}：涉及 ${item.projectCount} 个项目`).join('；')
     : '本期没有规则发现。';
 
   return [

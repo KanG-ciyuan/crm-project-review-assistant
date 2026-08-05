@@ -94,7 +94,7 @@ describe('createReviewSummary', () => {
       ['部门：华东部']
     );
 
-    expect(summary.meta.title).toBe('储备项目经营复盘');
+    expect(summary.meta.title).toBe('储备项目经营复盘报告');
     expect(summary.scope).toEqual(['部门：华东部']);
     expect(summary.executiveConclusions).toHaveLength(4);
     expect(summary.executiveConclusions.join('\n')).toMatch(/5 个项目[\s\S]*40,000 万元/);
@@ -121,8 +121,9 @@ describe('createReviewSummary', () => {
     expect(summary.overallConclusions).toBe(summary.executiveConclusions);
     expect(summary.ruleDistribution.categories).toBe(summary.appendix.categories);
     expect(summary.priorityIssues).toContainEqual({ label: '跟进超期', projectCount: 1 });
-    expect(summary.focusScopes[0]).toEqual({ type: '部门', name: '华东部', projectCount: 2 });
-    expect(summary.actions).toEqual(summary.departmentActions.slice(0, 3).map((item) => item.suggestedAction));
+    expect(summary.focusScopes).toContainEqual({ type: '部门', name: '华东部', projectCount: 3 });
+    expect(summary.focusScopes[0]).toEqual({ type: '负责人', name: '销售甲', projectCount: 5 });
+    expect(summary.actions).toHaveLength(3);
   });
 
   it('orders decisions by status, amount with null last, and stable project identity', () => {
@@ -200,6 +201,64 @@ describe('createReviewSummary', () => {
     expect(summary.departmentActions.find((item) => item.department === '高频部门')?.mainIssue).toBe('高频问题');
     expect(summary.departmentActions.find((item) => item.department === '同频部门')?.mainIssue).toBe('A问题');
   });
+
+  it('does not let a stale ignored manual review suppress a current fact-only project', () => {
+    const project = makeProject({ sourceKey: 'stale-ignore', projectId: 'FACT-1', department: '事实部门' });
+    const currentFinding = finding(
+      project, 'follow-up-overdue', 'action', '跟进超期', '最近跟进已超过 30 天', '维护超期待整改'
+    );
+    const summary = createReviewSummary(
+      buildAnalysis([project], [currentFinding], reportDate),
+      { 'stale-ignore': review(project, '已忽略', '之前忽略的是已消失的人工规则。') }
+    );
+
+    expect(summary.priorityProjects.map((item) => item.projectId)).toEqual(['FACT-1']);
+    expect(summary.priorityProjects[0].reviewStatus).toBe('无需人工复核');
+    expect(summary.departmentActions).toContainEqual(expect.objectContaining({ department: '事实部门', projectCount: 1 }));
+  });
+
+  it('keeps normalized raw display text in the summary and escapes only the markdown export', () => {
+    const project = makeProject({
+      sourceKey: 'raw-display', projectId: 'A&B', projectName: '项目 & 方案',
+      department: '华东|重点', salesManager: '销售&A'
+    });
+    const unsafeFinding = finding(project, 'similar-name', 'review', '问题&A', '证据|B');
+    const analysis = buildAnalysis([project], [unsafeFinding], reportDate);
+    const reviews = { 'raw-display': review(project, '确认业务风险', '客户&A确认') };
+    const summary = createReviewSummary(analysis, reviews, ['部门：华东|重点']);
+    const report = createReviewReport(analysis, reviews, reportDate, ['部门：华东|重点']);
+
+    expect(summary.scope).toEqual(['部门：华东|重点']);
+    expect(summary.priorityProjects[0]).toMatchObject({
+      projectId: 'A&B', projectName: '项目 & 方案', department: '华东|重点',
+      salesManager: '销售&A', evidence: ['问题&A：证据|B'], reviewConclusion: '客户&A确认'
+    });
+    expect(summary.departmentActions[0].mainIssue).toBe('问题&A');
+    expect(report).toContain('A&amp;B');
+    expect(report).toContain('华东&#124;重点');
+    expect(report).not.toContain('&amp;amp;');
+  });
+
+  it('keeps legacy focus scopes for departments and managers and provides fallback actions', () => {
+    const first = makeProject({ sourceKey: 'legacy-a', department: '华东部', salesManager: '销售甲' });
+    const second = makeProject({ sourceKey: 'legacy-b', department: '华东部', salesManager: '销售乙' });
+    const populated = createReviewSummary(buildAnalysis([first, second], [
+      finding(first, 'follow-up-overdue', 'action', '跟进超期', '证据一', '维护超期待整改'),
+      finding(second, 'follow-up-overdue', 'action', '跟进超期', '证据二', '维护超期待整改')
+    ], reportDate), {});
+    const empty = createReviewSummary(buildAnalysis([], [], reportDate), {});
+
+    expect(populated.focusScopes).toEqual([
+      { type: '部门', name: '华东部', projectCount: 2 },
+      { type: '负责人', name: '销售甲', projectCount: 1 },
+      { type: '负责人', name: '销售乙', projectCount: 1 }
+    ]);
+    expect(empty.actions).toEqual([
+      '持续抽查规则发现，保持数据质量。',
+      '对关键字段和日期保持定期校验。',
+      '围绕问题项目较集中的部门和负责人，安排下一轮经营跟进。'
+    ]);
+  });
 });
 
 describe('createReviewReport', () => {
@@ -221,10 +280,11 @@ describe('createReviewReport', () => {
       '## 四、部门责任与后续安排',
       '## 五、附录：数据范围与识别规则'
     ]);
+    expect(report).toMatch(/^# 储备项目经营复盘报告$/m);
     expect(report).toMatch(/### 决策项目 1：RISK-1 重点风险项目/);
     expect(report).toContain('人工结论：客户预算冻结。');
-    expect(report).toContain('| 项目 | 金额（万元） | 阶段 | 部门 | 负责人 | 证据与结论 | 建议动作 |');
-    expect(report).toContain('| ACTION-1 跟进超期项目 | 金额未填写 | 跟进中 | 华南部 | 销售甲 |');
+    expect(report).toContain('| 项目 | 金额 | 当前阶段 | 发现的问题 | 人工复核结论 | 建议动作 | 责任部门 / 负责人 |');
+    expect(report).toContain('| ACTION-1 跟进超期项目 | 金额待确认 | 跟进中 | 跟进超期：最近跟进已超过 30 天 | 无需人工复核 | 核实规则证据并更新 CRM。 | 华南部 / 销售甲 |');
     expect(report).toContain('- 华东部：');
     expect(report).toContain('筛选范围：阶段：跟进中');
     expect(report).toContain('主要规则问题：跟进超期：涉及 1 个项目');
@@ -241,16 +301,20 @@ describe('createReviewReport', () => {
     expect(report).toContain('规则分类：本期没有规则发现。');
   });
 
-  it('does not append an amount unit to the explicit missing-amount state', () => {
-    const risk = makeProject({ sourceKey: 'missing-amount', projectId: 'RISK-NULL', amount: null });
+  it('uses a neutral pending state for missing, unknown-unit, or parse-error amounts', () => {
+    const risk = makeProject({
+      sourceKey: 'missing-amount', projectId: 'RISK-NULL', amount: 123,
+      amountParseError: true, unit: '无法识别'
+    });
     const report = createReviewReport(
       buildAnalysis([risk], [finding(risk, 'similar-name')], reportDate),
       { 'missing-amount': review(risk, '确认业务风险', '业务原因已确认。') },
       reportDate
     );
 
-    expect(report).toContain('基本信息：金额未填写；阶段');
-    expect(report).not.toContain('金额 金额未填写 万元');
+    expect(report).toContain('基本信息：金额待确认；阶段');
+    expect(report).toContain('| RISK-NULL 华城医院数字化改造 | 金额待确认 |');
+    expect(report).not.toContain('金额未填写');
   });
 
   it('keeps all imported and user-authored strings inline and markdown safe', () => {
@@ -283,20 +347,34 @@ describe('createReviewReport', () => {
   });
 
   it('keeps the markdown report bounded for 400 actionable projects', () => {
+    const longName = `超长项目${'名'.repeat(500)}`;
+    const longReason = `超长证据${'据'.repeat(5_000)}`;
     const rows = Array.from({ length: 400 }, (_, index) => makeProject({
       sourceKey: `row-${index + 1}`,
       projectId: `P-${index + 1}`,
-      projectName: `项目${index + 1}`,
+      projectName: `${longName}${index + 1}`,
       department: `部门${String(index + 1).padStart(3, '0')}`
     }));
-    const findings = rows.map((project) => finding(project, 'similar-name'));
+    const findings = rows.flatMap((project, index) => [
+      finding(project, 'similar-name', 'review', `问题${index + 1}`, longReason),
+      ...(index === 0 ? [
+        finding(project, 'amount-placeholder', 'review', '第二问题', longReason),
+        finding(project, 'duplicate-record', 'review', '第三问题', longReason)
+      ] : [])
+    ]);
     const analysis = buildAnalysis(rows, findings, reportDate);
-    const summary = createReviewSummary(analysis, {});
-    const report = createReviewReport(analysis, {}, reportDate);
+    const reviews = { 'row-1': review(rows[0], '确认业务风险', `超长结论${'论'.repeat(5_000)}`) };
+    const summary = createReviewSummary(analysis, reviews);
+    const report = createReviewReport(analysis, reviews, reportDate);
 
     expect(summary.departmentActions).toHaveLength(10);
     expect(summary.departmentActions[0].department).toBe('部门001');
     expect(summary.priorityProjects.length + summary.appendix.remainingProjects.length).toBe(400);
+    expect(summary.priorityProjects[0].projectName.length).toBeLessThanOrEqual(80);
+    expect(summary.priorityProjects[0].evidence).toHaveLength(2);
+    expect(summary.priorityProjects[0].evidence.every((item) => item.length <= 160)).toBe(true);
+    expect(summary.priorityProjects[0].reviewConclusion.length).toBeLessThanOrEqual(160);
+    expect(summary.priorityProjects[0].projectName.endsWith('…')).toBe(true);
     expect(report).toContain('待管理层决策 400 个项目');
     expect(report).toContain('剩余项目：390 个');
     expect(report.split('\n').length).toBeLessThan(180);
