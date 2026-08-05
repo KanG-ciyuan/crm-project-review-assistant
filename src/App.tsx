@@ -80,8 +80,12 @@ export function ReviewTool({ onBack }: { onBack?: () => void }) {
   );
   const filterScope = useMemo(() => describeFilters(filters), [filters]);
   const currentReport = useMemo(
-    () => visibleAnalysis ? createReviewReport(visibleAnalysis, reviewRecords, new Date(), filterScope) : '',
-    [visibleAnalysis, reviewRecords, filterScope]
+    () => visibleAnalysis ? createReviewReport(visibleAnalysis, reviewRecords, new Date(), filterScope, {
+      sourceName: fileName,
+      sheetName,
+      sourceNamespace: activeSourceNamespace
+    }) : '',
+    [visibleAnalysis, reviewRecords, filterScope, fileName, sheetName, activeSourceNamespace]
   );
   const currentSummary = useMemo(
     () => visibleAnalysis ? createReviewSummary(visibleAnalysis, reviewRecords, filterScope) : null,

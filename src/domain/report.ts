@@ -54,6 +54,12 @@ export interface ReviewSummaryData {
   };
 }
 
+export interface ReportSourceContext {
+  sourceName?: string;
+  sheetName?: string;
+  sourceNamespace?: string;
+}
+
 export function formatLocalDate(date: Date): string {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -205,6 +211,17 @@ function reviewCounts(rows: ProjectWorkbenchRow[], reviews: ReviewRecordMap): Re
   return counts;
 }
 
+function dominantIssue(rows: ProjectWorkbenchRow[]): { label: string; count: number } | null {
+  const counts = new Map<string, number>();
+  rows.forEach((row) => {
+    const labels = new Set(row.findings.map((finding) => normalizedValue(finding.label, '未命名规则')));
+    labels.forEach((label) => counts.set(label, (counts.get(label) ?? 0) + 1));
+  });
+  const [label, count] = [...counts.entries()]
+    .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0], 'zh-CN'))[0] ?? [];
+  return label === undefined || count === undefined ? null : { label, count };
+}
+
 function departmentActions(
   rows: ProjectWorkbenchRow[],
   itemsByKey: Map<string, ManagementProjectItem>
@@ -285,12 +302,15 @@ export function createReviewSummary(
     .sort(compareAmountAndIdentity);
   const decisionAmount = decisionItems.reduce((sum, item) => sum + (item.amountWan ?? 0), 0);
   const objectiveAmount = objectiveItems.reduce((sum, item) => sum + (item.amountWan ?? 0), 0);
+  const concentratedIssue = dominantIssue(workbenchRows);
 
   const executiveConclusions = [
     `本期覆盖 ${analysis.overview.projectCount} 个项目，储备金额 ${formatAmount(analysis.overview.totalAmountWan)} 万元。`,
     `待管理层决策 ${decisionItems.length} 个项目，涉及金额 ${formatAmount(decisionAmount)} 万元，其中确认业务风险 ${counts['确认业务风险']} 个、待复核 ${counts['待复核']} 个。`,
     `有客观规则行动证据的项目 ${objectiveItems.length} 个，涉及金额 ${formatAmount(objectiveAmount)} 万元。`,
-    `人工复核已确认 ${counts['确认业务风险'] + counts['确认数据错误']} 个、待复核 ${counts['待复核']} 个、已忽略 ${counts['已忽略']} 个。`
+    concentratedIssue
+      ? `本期最集中问题为“${concentratedIssue.label}”，涉及 ${concentratedIssue.count} 个项目；优先推动相关责任团队核实证据并补充处理结论。`
+      : '本期没有规则发现，无需推动整改动作。'
   ];
   const actionsByDepartment = departmentActions(eligibleRows, itemsByKey);
   const categories = categoryCounts(analysis);
@@ -356,11 +376,38 @@ function departmentList(items: DepartmentActionItem[]): string {
   return items.map((item) => `- ${markdown(item.department)}：${item.projectCount} 个项目，金额 ${formatAmount(item.amountWan)} 万元；主要问题：${markdown(item.mainIssue)}；已复核 ${item.reviewedCount} 个，待复核 ${item.pendingCount} 个；后续安排：${markdown(item.suggestedAction)}`).join('\n');
 }
 
+const MAX_PENDING_APPENDIX_ITEMS = 20;
+
+function sourceLine(context: ReportSourceContext): string {
+  const sourceName = normalizedInline(context.sourceName ?? '');
+  const sourceNamespace = normalizedInline(context.sourceNamespace ?? '');
+  if (sourceName && sourceNamespace) return `数据来源：${markdown(sourceName)}（${markdown(sourceNamespace)}）`;
+  if (sourceName) return `数据来源：${markdown(sourceName)}`;
+  if (sourceNamespace) return `数据来源：${markdown(sourceNamespace)}`;
+  return '数据来源：当前浏览器本地导入数据';
+}
+
+function pendingAppendix(items: ManagementProjectItem[]): string[] {
+  const pending = items.filter((item) => item.reviewStatus === '待复核');
+  if (pending.length === 0) return ['- 未进入正文的待确认项目：无。'];
+  const visible = pending.slice(0, MAX_PENDING_APPENDIX_ITEMS);
+  const lines = [
+    `- 未进入正文的待确认项目（最多列示 ${MAX_PENDING_APPENDIX_ITEMS} 个）：`,
+    ...visible.map((item) => {
+      const ruleLabels = item.evidence.map((evidence) => evidence.split('：', 1)[0]).map(markdown).join('；');
+      return `  - ${markdown(item.projectId)} ${markdown(item.projectName)}；部门 ${markdown(item.department)}；${amountDetail(item.amountWan)}；阶段 ${markdown(item.stage)}；规则/复核状态：${ruleLabels} / ${item.reviewStatus}。`;
+    })
+  ];
+  if (pending.length > visible.length) lines.push(`  - 其余 ${pending.length - visible.length} 个待确认项目未展开，请在项目明细 Excel 中核查。`);
+  return lines;
+}
+
 export function createReviewReport(
   analysis: AnalysisResult,
   reviews: ReviewRecordMap,
   today: Date,
-  filterScope: string[] = []
+  filterScope: string[] = [],
+  sourceContext: ReportSourceContext = {}
 ): string {
   const generated = createReviewSummary(analysis, reviews, filterScope);
   const summary: ReviewSummaryData = {
@@ -375,7 +422,10 @@ export function createReviewReport(
   return [
     `# ${summary.meta.title}`,
     `生成日期：${summary.meta.generatedDate}`,
+    sourceLine(sourceContext),
+    sourceContext.sheetName?.trim() ? `工作表：${markdown(sourceContext.sheetName)}` : null,
     `筛选范围：${scope}`,
+    '统计口径：项目与储备金额统一按万元统计；金额待确认项目不计入金额合计。',
     `> ${summary.meta.disclaimer}`,
     '## 一、本期经营结论',
     summary.executiveConclusions.map((item) => `- ${item}`).join('\n'),
@@ -391,7 +441,8 @@ export function createReviewReport(
       `- 规则分类：${categories}`,
       `- 人工复核状态：${statuses}。`,
       `- 剩余项目：${summary.appendix.remainingProjects.length} 个；为控制报告长度，仅保留在结构化摘要中。`,
+      ...pendingAppendix(summary.appendix.remainingProjects),
       '- 识别边界：规则只提供客观证据，真实原因和业务结论由业务人员确认。'
-    ].join('\n')
-  ].join('\n\n');
+    ].filter((line): line is string => line !== null).join('\n')
+  ].filter((line): line is string => line !== null).join('\n\n');
 }

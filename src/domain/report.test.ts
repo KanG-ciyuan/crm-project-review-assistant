@@ -408,4 +408,35 @@ describe('createReviewReport', () => {
     expect(formatLocalDate(localDate)).toBe(expected);
     expect(report).toContain(`生成日期：${expected}`);
   });
+
+  it('states report provenance, consistent monetary units, and bounded pending appendix details', () => {
+    const rows = Array.from({ length: 34 }, (_, index) => makeProject({
+      sourceKey: `pending-${index + 1}`,
+      projectId: `P-${index + 1}`,
+      projectName: `待确认项目 ${index + 1}`,
+      department: '华东部',
+      amount: 100 + index,
+      status: '跟进中'
+    }));
+    const analysis = buildAnalysis(rows, rows.map((project) => finding(project, 'similar-name')), reportDate);
+    const report = createReviewReport(analysis, {}, reportDate, [], {
+      sourceName: '华东事业部 CRM 导出.xlsx',
+      sheetName: '储备项目',
+      sourceNamespace: '华东事业部 CRM'
+    });
+
+    expect(report).toContain('数据来源：华东事业部 CRM 导出.xlsx（华东事业部 CRM）');
+    expect(report).toContain('工作表：储备项目');
+    expect(report).toContain('统计口径：项目与储备金额统一按万元统计；金额待确认项目不计入金额合计。');
+    expect(report).toContain('本期最集中问题为“名称相似待核验”');
+    expect(report).toContain('未进入正文的待确认项目（最多列示 20 个）：');
+    expect(report).toContain('P-11 待确认项目 11；部门 华东部；金额 110 万元；阶段 跟进中；规则/复核状态：名称相似待核验 / 待复核。');
+    expect(report).toContain('其余 4 个待确认项目未展开，请在项目明细 Excel 中核查。');
+  });
+
+  it('uses an honest no-issue conclusion when no rule finding exists', () => {
+    const report = createReviewReport(buildAnalysis([makeProject({ sourceKey: 'ordinary' })], [], reportDate), {}, reportDate);
+
+    expect(report).toContain('本期没有规则发现，无需推动整改动作。');
+  });
 });

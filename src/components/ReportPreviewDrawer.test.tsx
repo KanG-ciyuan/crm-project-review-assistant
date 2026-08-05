@@ -206,4 +206,22 @@ describe('ReportPreviewDrawer', () => {
     view.unmount();
     expect(background?.inert).toBe(true);
   });
+
+  it('keeps Tab and Shift+Tab focus within the modal controls', async () => {
+    const user = userEvent.setup();
+    renderDrawer({ stale: true });
+    const close = screen.getByRole('button', { name: '关闭报告预览' });
+    const regenerate = screen.getByRole('button', { name: '重新生成预览' });
+    const download = screen.getByRole('button', { name: '下载 Markdown' });
+
+    expect(close).toHaveFocus();
+    await user.keyboard('{Shift>}{Tab}{/Shift}');
+    expect(download).toHaveFocus();
+    await user.keyboard('{Tab}');
+    expect(close).toHaveFocus();
+    await user.keyboard('{Tab}');
+    expect(screen.getByRole('button', { name: '关闭预览' })).toHaveFocus();
+    await user.keyboard('{Tab}');
+    expect(regenerate).toHaveFocus();
+  });
 });

@@ -243,7 +243,7 @@ it('keeps review input visible and offers retry when browser storage fails', asy
   expect(screen.getByRole('alert')).toHaveTextContent('自动保存失败');
   expect(screen.getByRole('button', { name: '重试保存' })).toBeInTheDocument();
   await user.click(screen.getByRole('tab', { name: '复盘报告' }));
-  expect(screen.getByText(/人工复核已确认 1 个、待复核 1 个/)).toBeInTheDocument();
+  expect(screen.getByText(/本期最集中问题为/)).toBeInTheDocument();
 });
 
 it('runs the confirmed 30-day rule pack and removes the legacy percentile rule', async () => {
