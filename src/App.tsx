@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { ArrowLeft, Copy, Download, FileSpreadsheet, GitFork, Mail, ShieldCheck, Upload } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import './review.css';
@@ -9,10 +9,12 @@ import { AnalysisFilters } from './components/AnalysisFilters';
 import { AnalysisWorkspace } from './components/AnalysisWorkspace';
 import { ImportWizard, type ImportReadyPayload } from './components/ImportWizard';
 import { ProductLanding } from './components/ProductLanding';
+import { ReportPreviewDrawer } from './components/ReportPreviewDrawer';
 import { buildAnalysis, evaluateRulePack, projectAnalysis, type AnalysisResult, type CanonicalFieldKey } from './domain/analyze';
 import { describeFilters, EMPTY_FILTERS, filterProjectKeys, type FilterState } from './domain/filters';
 import { createProjectDetailWorkbook } from './domain/projectDetailExport';
 import { createReviewReport, createReviewSummary, formatLocalDate } from './domain/report';
+import { createReportSnapshot, isReportSnapshotStale, type ReportPreviewSnapshot } from './domain/reportSnapshot';
 import { loadReviewRecords, reconcileReviewRecords, saveReviewRecords, updateReviewRecord, type ReviewRecordMap, type ReviewStatus } from './domain/review';
 import { buildProjectWorkbenchRows, manualReviewKeys } from './domain/workbench';
 import { inspectSheet, inspectWorkbook, type WorkbookInspection } from './lib/workbook';
@@ -58,6 +60,13 @@ export function ReviewTool({ onBack }: { onBack?: () => void }) {
   const [reviewRecords, setReviewRecords] = useState<ReviewRecordMap>(() => loadReviewRecords(window.localStorage));
   const [storageError, setStorageError] = useState('');
   const [feedbackCopied, setFeedbackCopied] = useState(false);
+  const [reportSnapshot, setReportSnapshot] = useState<ReportPreviewSnapshot | null>(null);
+  const [reportPreviewOpen, setReportPreviewOpen] = useState(false);
+  const [reportDownloaded, setReportDownloaded] = useState(false);
+  const [reportDownloadError, setReportDownloadError] = useState('');
+  const [activeSourceNamespace, setActiveSourceNamespace] = useState('');
+  const appShellRef = useRef<HTMLDivElement>(null);
+  const reportPreviewTriggerRef = useRef<HTMLButtonElement>(null);
 
   const sheetInspection = useMemo(() => inspection && sheetName ? inspectSheet(inspection.workbook, sheetName) : null, [inspection, sheetName]);
   const selectedKeys = useMemo(
@@ -78,6 +87,14 @@ export function ReviewTool({ onBack }: { onBack?: () => void }) {
     [visibleAnalysis, reviewRecords, filterScope]
   );
   const confirmedSourceNamespace = sourceNamespace.trim();
+  const reportSourceSignature = useMemo(() => JSON.stringify({
+    source: activeSourceNamespace,
+    analysisGeneratedAt: analysis?.generatedAt ?? '',
+    filters,
+    reviews: reviewRecords,
+    markdown: currentReport
+  }), [activeSourceNamespace, analysis?.generatedAt, currentReport, filters, reviewRecords]);
+  const reportIsStale = isReportSnapshotStale(reportSnapshot, reportSourceSignature);
 
   function persistReviews(records: ReviewRecordMap) {
     try {
@@ -125,6 +142,11 @@ export function ReviewTool({ onBack }: { onBack?: () => void }) {
     const reviewKeys = manualReviewKeys(nextFindings);
     const nextReviews = reconcileReviewRecords(result.rows, reviewKeys, reviewRecords, now);
     persistReviews(nextReviews);
+    if (activeSourceNamespace && activeSourceNamespace !== confirmedSourceNamespace) {
+      setReportSnapshot(null);
+      setReportPreviewOpen(false);
+    }
+    setActiveSourceNamespace(confirmedSourceNamespace);
     setAnalysis(result);
     setFilters(EMPTY_FILTERS);
     setImportReady(payload);
@@ -160,8 +182,8 @@ export function ReviewTool({ onBack }: { onBack?: () => void }) {
     const objectUrl = URL.createObjectURL(blob);
     link.href = objectUrl;
     link.download = fileName;
-    document.body.append(link);
     try {
+      document.body.append(link);
       link.click();
     } finally {
       link.remove();
@@ -169,12 +191,30 @@ export function ReviewTool({ onBack }: { onBack?: () => void }) {
     }
   }
 
-  function downloadCurrentReport() {
+  function openReportPreview() {
     if (!currentReport.trim()) return;
-    downloadBlob(
-      new Blob([currentReport], { type: 'text/markdown;charset=utf-8' }),
-      `储备项目经营复盘-${formatLocalDate(new Date())}-当前筛选.md`
-    );
+    if (!reportSnapshot) setReportSnapshot(createReportSnapshot(currentReport, reportSourceSignature, new Date()));
+    setReportDownloaded(false);
+    setReportDownloadError('');
+    setReportPreviewOpen(true);
+  }
+
+  function regenerateReportPreview() {
+    if (!currentReport.trim()) return;
+    setReportSnapshot(createReportSnapshot(currentReport, reportSourceSignature, new Date()));
+    setReportDownloaded(false);
+    setReportDownloadError('');
+  }
+
+  function downloadReportSnapshot(snapshot: ReportPreviewSnapshot) {
+    try {
+      downloadBlob(new Blob([snapshot.markdown], { type: 'text/markdown;charset=utf-8' }), snapshot.fileName);
+      setReportDownloaded(true);
+      setReportDownloadError('');
+    } catch {
+      setReportDownloaded(false);
+      setReportDownloadError('报告下载失败，请重试。');
+    }
   }
 
   function downloadProjectDetails(selection: Set<string>) {
@@ -199,7 +239,8 @@ export function ReviewTool({ onBack }: { onBack?: () => void }) {
     }
   }
 
-  return <div className="app-shell">
+  return <>
+    <div className="app-shell" ref={appShellRef}>
     <aside className="sidebar">
       <div className="brand"><div className="brand-mark">CRM</div><div><strong>CRM 项目运营复盘</strong><span>储备项目分析助手</span></div></div>
       <div className="side-section"><p className="side-label">导入 Excel</p><label className="upload-button"><Upload size={16} /> 选择 .xlsx 文件<input className="visually-hidden-file" aria-label="选择 .xlsx 文件" type="file" accept=".xlsx" onChange={(event) => onFileChange(event.target.files?.[0] ?? null)} /></label>
@@ -231,8 +272,9 @@ export function ReviewTool({ onBack }: { onBack?: () => void }) {
           filterControls={<AnalysisFilters analysis={analysis} filters={filters} reviews={reviewRecords} selectedCount={selectedKeys.size} totalCount={analysis.rows.length} onChange={setFilters} />}
           summary={currentSummary}
           onChangeReview={changeReview}
-          onDownloadMarkdown={downloadCurrentReport}
+          onDownloadMarkdown={openReportPreview}
           onDownloadExcel={downloadProjectDetails}
+          previewButtonRef={reportPreviewTriggerRef}
         />
       </>}
       <footer className="product-footer">
@@ -244,7 +286,19 @@ export function ReviewTool({ onBack }: { onBack?: () => void }) {
         <a href="https://github.com/KanG-ciyuan/crm-project-review-assistant" target="_blank" rel="noreferrer"><GitFork size={14} /> 代码与版本</a>
       </footer>
     </main>
-  </div>;
+    </div>
+    {reportPreviewOpen && reportSnapshot && <ReportPreviewDrawer
+      snapshot={reportSnapshot}
+      stale={reportIsStale}
+      downloaded={reportDownloaded}
+      downloadError={reportDownloadError}
+      onClose={() => setReportPreviewOpen(false)}
+      onRegenerate={regenerateReportPreview}
+      onDownload={downloadReportSnapshot}
+      returnFocusRef={reportPreviewTriggerRef}
+      backgroundRef={appShellRef}
+    />}
+  </>;
 }
 
 function Threshold({ label, value, suffix }: { label: string; value: number; suffix: string }) {

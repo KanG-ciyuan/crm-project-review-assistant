@@ -276,6 +276,8 @@ it('projects one global filter across metrics and result areas without changing 
   });
 
   fireEvent.click(screen.getByRole('button', { name: '预览完整报告' }));
+  expect(screen.getByRole('dialog', { name: '管理层复盘报告预览' })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: '下载 Markdown' }));
   fireEvent.click(screen.getByRole('button', { name: '导出项目明细.xlsx' }));
 
   const expectedLocalDate = formatLocalDate(new Date());
@@ -306,10 +308,16 @@ it('projects one global filter across metrics and result areas without changing 
   expect(exportedRows).toHaveLength(1);
   expect(exportedRows[0]['项目编码']).toBe('EAST');
 
+  await user.click(screen.getByRole('button', { name: '关闭预览' }));
   await user.click(screen.getByRole('tab', { name: /^问题项目，\d+ 个$/ }));
   await user.click(screen.getByRole('button', { name: '清除全部筛选' }));
   expect(screen.getAllByText('当前筛选 2 / 全部 2 个项目')).toHaveLength(2);
   expect(screen.getByText('华南超期项目')).toBeInTheDocument();
+  await user.click(screen.getByRole('tab', { name: '复盘报告' }));
+  await user.click(screen.getByRole('button', { name: '预览完整报告' }));
+  expect(screen.getByRole('status')).toHaveTextContent('数据已更新，请重新生成预览');
+  await user.click(screen.getByRole('button', { name: '重新生成预览' }));
+  expect(screen.queryByText('数据已更新，请重新生成预览')).not.toBeInTheDocument();
 });
 
 it('analyzes an arbitrary Excel workflow and keeps seller filters, findings, metrics, and report in sync', async () => {
@@ -440,4 +448,55 @@ it('requires a nonblank confirmed data source before opening the import wizard',
 
   expect(screen.getByRole('alert')).toHaveTextContent('请填写数据来源标识后继续导入。');
   expect(screen.queryByRole('heading', { name: '数据已准备好' })).not.toBeInTheDocument();
+});
+
+it('keeps project reviews independent and clears an old report snapshot when a new source is imported', async () => {
+  const user = userEvent.setup();
+  const firstWorkbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(firstWorkbook, XLSX.utils.aoa_to_sheet([
+    ['项目编号', '项目名称', '客户名称', '销售经理', '储备金额', '金额单位'],
+    ['A-1', '甲项目', '客户甲', '销售甲', 100, '万元'],
+    ['A-1', '甲项目副本', '客户甲', '销售甲', 100, '万元'],
+    ['B-1', '乙项目', '客户乙', '销售乙', 100, '万元'],
+    ['B-1', '乙项目副本', '客户乙', '销售乙', 100, '万元']
+  ]), '商机表');
+  const secondWorkbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(secondWorkbook, XLSX.utils.aoa_to_sheet([
+    ['项目编号', '项目名称', '客户名称', '销售经理', '储备金额', '金额单位'],
+    ['C-1', '丙项目', '客户丙', '销售丙', 100, '万元'],
+    ['C-1', '丙项目副本', '客户丙', '销售丙', 100, '万元']
+  ]), '商机表');
+  vi.spyOn(workbookApi, 'inspectWorkbook')
+    .mockResolvedValueOnce({ workbook: firstWorkbook, sheetNames: ['商机表'] })
+    .mockResolvedValueOnce({ workbook: secondWorkbook, sheetNames: ['商机表'] });
+
+  render(<ReviewTool />);
+  const input = screen.getByLabelText('选择 .xlsx 文件');
+  await user.upload(input, new File(['first'], '华东台账.xlsx'));
+  await user.click(screen.getByRole('button', { name: '开始分析' }));
+  await user.click(screen.getByRole('tab', { name: /^问题项目，\d+ 个$/ }));
+  await user.selectOptions(screen.getAllByRole('combobox', { name: 'A-1 审查状态' })[0], '确认数据错误');
+  expect(screen.getAllByRole('combobox', { name: 'A-1 审查状态' })[0]).toHaveValue('确认数据错误');
+  expect(screen.getAllByRole('combobox', { name: 'B-1 审查状态' })[0]).toHaveValue('待复核');
+
+  await user.click(screen.getByRole('tab', { name: /^人工复核，\d+ 个$/ }));
+  expect(screen.getByText('甲项目')).toBeInTheDocument();
+  expect(screen.getAllByRole('combobox', { name: 'A-1 审查状态' })[0]).toHaveValue('确认数据错误');
+  expect(screen.getAllByRole('combobox', { name: 'B-1 审查状态' })[0]).toHaveValue('待复核');
+  await user.click(screen.getByRole('tab', { name: '复盘报告' }));
+  await user.click(screen.getByRole('button', { name: '预览完整报告' }));
+  expect(screen.getByRole('dialog')).toHaveTextContent('甲项目');
+  await user.click(screen.getByRole('button', { name: '关闭预览' }));
+
+  await user.upload(input, new File(['second'], '华南台账.xlsx'));
+  const source = screen.getByLabelText('数据来源标识（企业/账套）');
+  await user.clear(source);
+  await user.type(source, '华南事业部 CRM');
+  await user.click(screen.getByRole('button', { name: '开始分析' }));
+  await user.click(screen.getByRole('tab', { name: '复盘报告' }));
+  await user.click(screen.getByRole('button', { name: '预览完整报告' }));
+
+  expect(screen.getByRole('dialog')).toHaveTextContent('丙项目');
+  expect(screen.getByRole('dialog')).not.toHaveTextContent('甲项目');
+  expect(screen.queryByText('数据已更新，请重新生成预览')).not.toBeInTheDocument();
 });

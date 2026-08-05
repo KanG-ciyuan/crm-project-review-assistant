@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { useMemo, useRef, useState, type KeyboardEvent, type ReactNode, type RefObject } from 'react';
 import type { AnalysisResult } from '../domain/analysis';
 import type { FilterState } from '../domain/filters';
 import type { ReviewSummaryData } from '../domain/report';
@@ -24,6 +24,7 @@ interface AnalysisWorkspaceProps {
   onChangeReview: (rowKey: string, patch: { status?: ReviewStatus; note?: string }) => void;
   onDownloadMarkdown: () => void;
   onDownloadExcel: (selectedKeys: Set<string>) => void;
+  previewButtonRef?: RefObject<HTMLButtonElement | null>;
 }
 
 const tabs: Array<{ id: WorkspaceTab; label: string; group: WorkspaceTabGroup }> = [
@@ -39,11 +40,12 @@ const tabGroupIds: Record<WorkspaceTabGroup, string> = {
   输出: 'tab-group-output'
 };
 
-export function AnalysisWorkspace({ analysis, relationAnalysis = analysis, fullCount, filters, reviews, filterControls, summary, onChangeReview, onDownloadMarkdown, onDownloadExcel }: AnalysisWorkspaceProps) {
+export function AnalysisWorkspace({ analysis, relationAnalysis = analysis, fullCount, filters, reviews, filterControls, summary, onChangeReview, onDownloadMarkdown, onDownloadExcel, previewButtonRef: providedPreviewButtonRef }: AnalysisWorkspaceProps) {
   const [activeTab, setActiveTab] = useState<WorkspaceTab>('overview');
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
-  const previewButtonRef = useRef<HTMLButtonElement>(null);
+  const fallbackPreviewButtonRef = useRef<HTMLButtonElement>(null);
+  const previewButtonRef = providedPreviewButtonRef ?? fallbackPreviewButtonRef;
   const visibleKeys = useMemo(() => new Set(analysis.rows.map(projectKey)), [analysis.rows]);
   const rows = useMemo(
     () => buildProjectWorkbenchRows(relationAnalysis).filter((row) => visibleKeys.has(row.rowKey)),
