@@ -299,7 +299,7 @@ it('projects one global filter across metrics and result areas without changing 
   const currentExport = await readBlob(exportedBlobs[0]);
   expect(currentExport).toContain('筛选范围：部门：华东部');
   expect(currentExport).toContain('跟进超期：涉及 1 个项目');
-  expect(currentExport).not.toContain('华东超期项目');
+  expect(currentExport).toContain('华东超期项目');
   expect(currentExport).not.toContain('华南超期项目');
   const excelBytes = await exportedBlobs[1].arrayBuffer();
   const exportedWorkbook = XLSX.read(excelBytes);
