@@ -123,4 +123,32 @@ describe('analysis workbench layout styles', () => {
     expect(radii.every((radius) => radius <= 6)).toBe(true);
     expect(allCss).toMatch(/letter-spacing:\s*0(?:px|em|rem)?\s*[;}]/);
   });
+
+  it('uses grouped top navigation and readable workbench controls', () => {
+    expect(reviewCss).toMatch(/\.workbench-tabs\s*\{[\s\S]*?min-height:\s*62px/);
+    expect(reviewCss).toMatch(/\.workbench-tab-group\s*\{[\s\S]*?display:\s*flex/);
+    expect(reviewCss).toMatch(/\.workbench-tab-group-label\s*\{[\s\S]*?font-size:\s*12px/);
+    expect(reviewCss).toMatch(/\.workbench-tabs\s+button\s*\{[\s\S]*?font-size:\s*14px/);
+    expect(reviewCss).toMatch(/\.review-control\s+(?:select|input),[\s\S]*?font-size:\s*14px[\s\S]*?min-height:\s*42px/);
+  });
+
+  it('gives manual review and report output a dense, readable layout', () => {
+    expect(reviewCss).toMatch(/\.manual-review-list,\s*\.review-summary\s*\{[\s\S]*?border-radius:\s*4px/);
+    expect(reviewCss).toMatch(/\.manual-review-items\s*>\s*article\s*\{[\s\S]*?grid-template-columns:\s*minmax\(0,\s*1fr\)\s+minmax\(280px,\s*360px\)/);
+    expect(reviewCss).toMatch(/\.management-summary-metrics\s*\{[\s\S]*?grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\)/);
+  });
+
+  it('styles the report drawer and disables animation when motion is reduced', () => {
+    expect(reviewCss).toMatch(/\.report-preview-layer\s*\{[\s\S]*?position:\s*fixed/);
+    expect(reviewCss).toMatch(/\.report-preview-drawer\s*\{[\s\S]*?width:\s*min\(760px,\s*72vw\)/);
+    expect(reviewCss).toMatch(/\.report-preview-content\s*\{[\s\S]*?overflow-y:\s*auto/);
+    expect(reviewCss).toMatch(/@keyframes\s+report-drawer-in/);
+    expect(allCss).toMatch(/@media\s*\(prefers-reduced-motion:\s*reduce\)[\s\S]*?\.report-preview-drawer[\s\S]*?animation:\s*none/);
+  });
+
+  it('collapses dense workbench layouts without creating mobile overflow', () => {
+    expect(reviewCss).toMatch(/@media\s*\(max-width:\s*760px\)[\s\S]*?\.manual-review-items\s*>\s*article\s*\{[\s\S]*?grid-template-columns:\s*minmax\(0,\s*1fr\)/);
+    expect(reviewCss).toMatch(/@media\s*\(max-width:\s*760px\)[\s\S]*?\.report-preview-drawer\s*\{[\s\S]*?width:\s*100%/);
+    expect(reviewCss).toMatch(/@media\s*\(max-width:\s*760px\)[\s\S]*?\.management-summary-metrics\s*\{[\s\S]*?grid-template-columns:\s*minmax\(0,\s*1fr\)/);
+  });
 });
