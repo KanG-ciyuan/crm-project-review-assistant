@@ -1,3 +1,4 @@
+import { createRef } from 'react';
 import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -19,35 +20,30 @@ const summary: ReviewSummaryData = {
     categories: [{ label: '重复与撞单', projectCount: 3 }],
     reviewStatuses: [{ status: '待复核', count: 3 }, { status: '确认数据错误', count: 0 }, { status: '确认业务风险', count: 0 }, { status: '已忽略', count: 0 }],
     remainingProjects: []
-  },
-  overallConclusions: ['本期分析 12 个项目。'],
-  priorityIssues: [{ label: '名称相似待核验', projectCount: 3 }],
-  focusScopes: [{ type: '部门', name: '华东部', projectCount: 3 }],
-  ruleDistribution: {
-    categories: [{ label: '重复与撞单', projectCount: 3 }],
-    reviewStatuses: [{ status: '待复核', count: 3 }, { status: '确认数据错误', count: 0 }, { status: '确认业务风险', count: 0 }, { status: '已忽略', count: 0 }]
-  },
-  actions: ['优先完成待复核项目。']
+  }
 };
 
 describe('ReviewSummary', () => {
-  it('renders structured summary semantics and accessible export commands', async () => {
+  it('renders management metrics, conclusions, and preview-first commands', async () => {
     const user = userEvent.setup();
-    const onDownloadMarkdown = vi.fn();
+    const onPreview = vi.fn();
     const onDownloadExcel = vi.fn();
-    render(<ReviewSummary summary={summary} onDownloadMarkdown={onDownloadMarkdown} onDownloadExcel={onDownloadExcel} />);
+    const previewButtonRef = createRef<HTMLButtonElement>();
+    render(<ReviewSummary summary={summary} onPreview={onPreview} onDownloadExcel={onDownloadExcel} previewButtonRef={previewButtonRef} />);
 
     const region = screen.getByRole('region', { name: '经营复盘摘要' });
     expect(within(region).getByRole('heading', { name: '储备项目经营复盘' })).toBeInTheDocument();
-    for (const heading of ['一、总体结论', '二、优先关注事项', '三、重点部门与负责人', '四、规则分布摘要', '五、建议行动']) {
-      expect(within(region).getByRole('heading', { name: heading })).toBeInTheDocument();
-    }
-    expect(within(region).getAllByRole('list')).toHaveLength(4);
-    expect(within(region).getByRole('table', { name: '规则与复核状态分布' })).toBeInTheDocument();
+    expect(within(region).getByText('分析项目')).toBeInTheDocument();
+    expect(within(region).getByText('12', { selector: 'strong' })).toBeInTheDocument();
+    expect(within(region).getByText('待决策事项')).toBeInTheDocument();
+    expect(within(region).getByText('重点项目')).toBeInTheDocument();
+    expect(within(region).getByText('本期分析 12 个项目。')).toBeInTheDocument();
+    expect(within(region).queryByRole('button', { name: /下载.*\.md/ })).not.toBeInTheDocument();
 
-    await user.click(within(region).getByRole('button', { name: '下载复盘摘要.md' }));
+    await user.click(within(region).getByRole('button', { name: '预览完整报告' }));
     await user.click(within(region).getByRole('button', { name: '导出项目明细.xlsx' }));
-    expect(onDownloadMarkdown).toHaveBeenCalledOnce();
+    expect(onPreview).toHaveBeenCalledOnce();
     expect(onDownloadExcel).toHaveBeenCalledOnce();
+    expect(previewButtonRef.current).toBe(within(region).getByRole('button', { name: '预览完整报告' }));
   });
 });

@@ -127,7 +127,7 @@ describe('AnalysisWorkspace', () => {
     expect(screen.getByRole('heading', { name: '分析标签分布' })).toBeInTheDocument();
   });
 
-  it('renders the semantic review summary and forwards both download commands', async () => {
+  it('renders the management summary and forwards preview and detail-export commands', async () => {
     const user = userEvent.setup();
     const onDownloadMarkdown = vi.fn();
     const onDownloadExcel = vi.fn();
@@ -145,7 +145,7 @@ describe('AnalysisWorkspace', () => {
 
     await user.click(screen.getByRole('tab', { name: '复盘报告' }));
     const panel = screen.getByRole('tabpanel', { name: '复盘报告' });
-    await user.click(within(panel).getByRole('button', { name: '下载复盘摘要.md' }));
+    await user.click(within(panel).getByRole('button', { name: '预览完整报告' }));
     await user.click(within(panel).getByRole('button', { name: '导出项目明细.xlsx' }));
 
     expect(onDownloadMarkdown).toHaveBeenCalledOnce();

@@ -118,12 +118,11 @@ describe('createReviewSummary', () => {
       department: '华东部', projectCount: 2, amountWan: 14000, reviewedCount: 1, pendingCount: 0
     }));
     expect(summary.departmentActions.every((item) => !item.suggestedAction.match(/责任人|截止|完成时间/))).toBe(true);
-    expect(summary.overallConclusions).toBe(summary.executiveConclusions);
-    expect(summary.ruleDistribution.categories).toBe(summary.appendix.categories);
-    expect(summary.priorityIssues).toContainEqual({ label: '跟进超期', projectCount: 1 });
-    expect(summary.focusScopes).toContainEqual({ type: '部门', name: '华东部', projectCount: 3 });
-    expect(summary.focusScopes[0]).toEqual({ type: '负责人', name: '销售甲', projectCount: 5 });
-    expect(summary.actions).toHaveLength(3);
+    expect(summary).not.toHaveProperty('overallConclusions');
+    expect(summary).not.toHaveProperty('priorityIssues');
+    expect(summary).not.toHaveProperty('focusScopes');
+    expect(summary).not.toHaveProperty('ruleDistribution');
+    expect(summary).not.toHaveProperty('actions');
   });
 
   it('orders decisions by status, amount with null last, and stable project identity', () => {
@@ -239,27 +238,6 @@ describe('createReviewSummary', () => {
     expect(report).not.toContain('&amp;amp;');
   });
 
-  it('keeps legacy focus scopes for departments and managers and provides fallback actions', () => {
-    const first = makeProject({ sourceKey: 'legacy-a', department: '华东部', salesManager: '销售甲' });
-    const second = makeProject({ sourceKey: 'legacy-b', department: '华东部', salesManager: '销售乙' });
-    const populated = createReviewSummary(buildAnalysis([first, second], [
-      finding(first, 'follow-up-overdue', 'action', '跟进超期', '证据一', '维护超期待整改'),
-      finding(second, 'follow-up-overdue', 'action', '跟进超期', '证据二', '维护超期待整改')
-    ], reportDate), {});
-    const empty = createReviewSummary(buildAnalysis([], [], reportDate), {});
-
-    expect(populated.focusScopes).toEqual([
-      { type: '部门', name: '华东部', projectCount: 2 },
-      { type: '负责人', name: '销售甲', projectCount: 1 },
-      { type: '负责人', name: '销售乙', projectCount: 1 }
-    ]);
-    expect(empty.actions).toEqual([
-      '持续抽查规则发现，保持数据质量。',
-      '对关键字段和日期保持定期校验。',
-      '围绕问题项目较集中的部门和负责人，安排下一轮经营跟进。'
-    ]);
-  });
-
   it('keeps long departments and managers distinct when their bounded labels collide', () => {
     const sharedDepartmentPrefix = '部门'.repeat(45);
     const sharedManagerPrefix = '负责人'.repeat(30);
@@ -281,8 +259,6 @@ describe('createReviewSummary', () => {
     expect(summary.departmentActions).toHaveLength(2);
     expect(summary.departmentActions.map((item) => item.mainIssue)).toEqual(['A问题', 'B问题']);
     expect(new Set(summary.departmentActions.map((item) => item.department))).toHaveLength(1);
-    expect(summary.focusScopes.filter((item) => item.type === '部门')).toHaveLength(2);
-    expect(summary.focusScopes.filter((item) => item.type === '负责人')).toHaveLength(2);
   });
 
   it('truncates display fields by Unicode code points without splitting a surrogate pair', () => {
@@ -326,7 +302,7 @@ describe('createReviewReport', () => {
     expect(report).toContain('| ACTION-1 跟进超期项目 | 金额待确认 | 跟进中 | 跟进超期：最近跟进已超过 30 天 | 无需人工复核 | 核实规则证据并更新 CRM。 | 华南部 / 销售甲 |');
     expect(report).toContain('- 华东部：');
     expect(report).toContain('筛选范围：阶段：跟进中');
-    expect(report).toContain('主要规则问题：跟进超期：涉及 1 个项目');
+    expect(report).toContain('规则分类：维护时效 1 个项目');
     expect(report).toMatch(/剩余项目：0 个/);
   });
 

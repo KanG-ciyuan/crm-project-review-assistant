@@ -191,8 +191,7 @@ it('keeps review input visible and offers retry when browser storage fails', asy
   expect(screen.getByRole('alert')).toHaveTextContent('自动保存失败');
   expect(screen.getByRole('button', { name: '重试保存' })).toBeInTheDocument();
   await user.click(screen.getByRole('tab', { name: '复盘报告' }));
-  const confirmedRow = screen.getByText('确认数据错误').closest('tr')!;
-  expect(within(confirmedRow).getByText('1')).toBeInTheDocument();
+  expect(screen.getByText(/人工复核已确认 1 个、待复核 1 个/)).toBeInTheDocument();
 });
 
 it('runs the confirmed 30-day rule pack and removes the legacy percentile rule', async () => {
@@ -254,7 +253,7 @@ it('projects one global filter across metrics and result areas without changing 
   expect(within(screen.getByText('项目总数').closest('article')!).getByText('1')).toBeInTheDocument();
   await user.click(screen.getByRole('tab', { name: '复盘报告' }));
   expect(screen.getByText('筛选范围：部门：华东部')).toBeInTheDocument();
-  expect(screen.getByText('跟进超期：涉及 1 个项目。')).toBeInTheDocument();
+  expect(screen.getByText('有客观规则行动证据的项目 1 个，涉及金额 1,200 万元。')).toBeInTheDocument();
   expect(screen.queryByLabelText('经营复盘草稿')).not.toBeInTheDocument();
 
   const createdUrls: string[] = [];
@@ -276,7 +275,7 @@ it('projects one global filter across metrics and result areas without changing 
     downloadedNames.push(this.download);
   });
 
-  fireEvent.click(screen.getByRole('button', { name: '下载复盘摘要.md' }));
+  fireEvent.click(screen.getByRole('button', { name: '预览完整报告' }));
   fireEvent.click(screen.getByRole('button', { name: '导出项目明细.xlsx' }));
 
   const expectedLocalDate = formatLocalDate(new Date());
@@ -298,7 +297,7 @@ it('projects one global filter across metrics and result areas without changing 
   });
   const currentExport = await readBlob(exportedBlobs[0]);
   expect(currentExport).toContain('筛选范围：部门：华东部');
-  expect(currentExport).toContain('跟进超期：涉及 1 个项目');
+  expect(currentExport).toContain('跟进超期：距离最近一次电话、微信或现场跟进已超过 30 天');
   expect(currentExport).toContain('华东超期项目');
   expect(currentExport).not.toContain('华南超期项目');
   const excelBytes = await exportedBlobs[1].arrayBuffer();

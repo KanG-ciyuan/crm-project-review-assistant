@@ -43,6 +43,7 @@ export function AnalysisWorkspace({ analysis, relationAnalysis = analysis, fullC
   const [activeTab, setActiveTab] = useState<WorkspaceTab>('overview');
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const previewButtonRef = useRef<HTMLButtonElement>(null);
   const visibleKeys = useMemo(() => new Set(analysis.rows.map(projectKey)), [analysis.rows]);
   const rows = useMemo(
     () => buildProjectWorkbenchRows(relationAnalysis).filter((row) => visibleKeys.has(row.rowKey)),
@@ -97,7 +98,7 @@ export function AnalysisWorkspace({ analysis, relationAnalysis = analysis, fullC
         : <ManualReviewList rows={rows} reviews={reviews} onChangeReview={onChangeReview} />}
     </div>}
     {activeTab === 'summary' && <div role="tabpanel" id="panel-summary" aria-labelledby="tab-summary">
-      <ReviewSummary summary={summary} onDownloadMarkdown={onDownloadMarkdown} onDownloadExcel={() => onDownloadExcel(new Set(selectedKeys))} />
+      <ReviewSummary summary={summary} onPreview={onDownloadMarkdown} onDownloadExcel={() => onDownloadExcel(new Set(selectedKeys))} previewButtonRef={previewButtonRef} />
     </div>}
   </section>;
 }
