@@ -5,7 +5,8 @@ import { readFileSync } from 'node:fs';
 const reviewCss = readFileSync('src/review.css', 'utf8');
 const globalCss = readFileSync('src/styles.css', 'utf8');
 const filterCss = readFileSync('src/filters.css', 'utf8');
-const allCss = `${reviewCss}\n${filterCss}\n${globalCss}`;
+const themeCss = readFileSync('src/tool-theme.css', 'utf8');
+const allCss = `${globalCss}\n${filterCss}\n${reviewCss}\n${themeCss}`;
 
 function cssHexVariable(name: string) {
   return globalCss.match(new RegExp(`--${name}:\\s*(#[0-9a-f]{6})`, 'i'))?.[1] ?? '#000000';
@@ -144,11 +145,20 @@ describe('analysis workbench layout styles', () => {
     expect(reviewCss).toMatch(/\.report-preview-content\s*\{[\s\S]*?overflow-y:\s*auto/);
     expect(reviewCss).toMatch(/@keyframes\s+report-drawer-in/);
     expect(allCss).toMatch(/@media\s*\(prefers-reduced-motion:\s*reduce\)[\s\S]*?\.report-preview-drawer[\s\S]*?animation:\s*none/);
+    expect(reviewCss).toMatch(/\.report-preview-table-wrap\s*\{[\s\S]*?overflow-x:\s*auto/);
+    expect(reviewCss).toMatch(/\.report-preview-table-wrap\s+table\s*\{[\s\S]*?min-width:\s*680px/);
   });
 
   it('collapses dense workbench layouts without creating mobile overflow', () => {
     expect(reviewCss).toMatch(/@media\s*\(max-width:\s*760px\)[\s\S]*?\.manual-review-items\s*>\s*article\s*\{[\s\S]*?grid-template-columns:\s*minmax\(0,\s*1fr\)/);
     expect(reviewCss).toMatch(/@media\s*\(max-width:\s*760px\)[\s\S]*?\.report-preview-drawer\s*\{[\s\S]*?width:\s*100%/);
     expect(reviewCss).toMatch(/@media\s*\(max-width:\s*760px\)[\s\S]*?\.management-summary-metrics\s*\{[\s\S]*?grid-template-columns:\s*minmax\(0,\s*1fr\)/);
+  });
+
+  it('keeps the management theme in the final loaded stylesheet layer', () => {
+    expect(themeCss).toMatch(/\.sidebar\s*\{[\s\S]*?background:\s*#eef3f3/);
+    expect(themeCss).toMatch(/\.app-shell\s*\{[\s\S]*?grid-template-columns:\s*272px/);
+    expect(themeCss).toMatch(/\.content\s+h1\s*\{[\s\S]*?font-size:\s*29px/);
+    expect(themeCss).toMatch(/\.upload-button\s*\{[\s\S]*?min-height:\s*44px/);
   });
 });
