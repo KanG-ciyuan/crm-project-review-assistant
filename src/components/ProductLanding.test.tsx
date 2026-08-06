@@ -35,3 +35,16 @@ it('switches the sticky workbench when the next workflow stage enters the page v
   expect(screen.getByRole('region', { name: '规则扫描' })).toHaveAttribute('data-active', 'true');
   expect(screen.getByRole('region', { name: '文件导入' })).toHaveAttribute('data-active', 'false');
 });
+
+it('describes the current workbench and labels fixed values as demonstration data', () => {
+  render(<ProductLanding onStart={vi.fn()} />);
+
+  expect(screen.getAllByText('演示数据').length).toBeGreaterThan(0);
+  for (const label of ['数据总览', '问题项目', '人工复核', '复盘报告']) {
+    expect(screen.getAllByText(label).length).toBeGreaterThan(0);
+  }
+  expect(screen.getByText(/先预览完整报告/)).toBeInTheDocument();
+  expect(screen.getByText(/下载 Markdown/)).toBeInTheDocument();
+  expect(screen.getByText(/导出项目明细 Excel/)).toBeInTheDocument();
+  expect(screen.queryByText('已识别 17 个标准字段，共 150 条项目数据，可以开始分析。')).not.toBeInTheDocument();
+});

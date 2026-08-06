@@ -27,8 +27,8 @@ const stages = [
   {
     number: '04',
     title: '系统发现线索，\n人做最终判断',
-    copy: '销售主管和运营人员确认问题状态、补充处理说明，并导出可追溯的复盘摘要与项目证据。',
-    tags: ['本地保存', 'Markdown', 'Excel']
+    copy: '业务人员确认线索与处理结论；管理层报告先预览完整报告，再下载 Markdown，并可导出项目明细 Excel。',
+    tags: ['人工复核', '报告预览', 'Markdown / Excel']
   }
 ] as const;
 
@@ -48,9 +48,9 @@ function HeroWorkbenchPreview() {
       <label>重点项目金额 <span>1000 万元</span></label>
     </aside>
     <main>
-      <header><h3>储备项目运营复盘助手</h3><p>以固定规则发现数据质量问题和经营风险，最终结论由业务人员确认。</p></header>
-      <section className="product-hero-ready"><small>智能识别完成</small><strong>数据已准备好</strong><p>已识别 17 个标准字段，共 150 条项目数据，可以开始分析。</p></section>
-      <nav><span>分析总览</span><span>项目问题清单</span><span>复盘摘要</span></nav>
+      <header><span className="product-demo-label">演示数据</span><h3>储备项目运营复盘助手</h3><p>以固定规则发现数据质量问题和经营风险，最终结论由业务人员确认。</p></header>
+      <section className="product-hero-ready"><small>智能识别完成</small><strong>数据已准备好</strong><p>已识别常用字段与项目记录，可以开始分析。</p></section>
+      <nav><span>数据总览</span><span>问题项目</span><span>人工复核</span><span>复盘报告</span></nav>
       <div className="product-hero-metrics">
         <article><small>项目总数</small><strong>150</strong><span>当前筛选</span></article>
         <article><small>储备金额</small><strong>8.4 亿</strong><span>统一金额口径</span></article>
@@ -169,7 +169,7 @@ export function ProductLanding({ onStart }: ProductLandingProps) {
     </section>
 
     <section className="product-preview" id="product-preview">
-      <div className="product-preview-head"><p className="product-kicker">Review workspace</p><h2>过程可以有动效，<br />判断必须保持清晰</h2></div>
+      <div className="product-preview-head"><p className="product-kicker">Review workspace</p><h2>过程可以有动效，<br />判断必须保持清晰</h2><span className="product-demo-label">演示数据</span></div>
       <div className="product-preview-metrics">
         <article><span>项目总数</span><strong>150</strong><small>当前筛选</small></article>
         <article><span>储备金额</span><strong>8.4 亿</strong><small>统一金额口径</small></article>
@@ -179,7 +179,7 @@ export function ProductLanding({ onStart }: ProductLandingProps) {
       </div>
       <div className="product-dashboard-preview">
         <aside><div><span>CRM</span><strong>项目运营复盘</strong></div><button type="button" onClick={onStart}>选择 .xlsx 文件</button><p>CRM历史项目表.xlsx<br />150 条项目记录</p><small>数据来源标识</small><b>华东事业部 CRM</b><small>工作表</small><b>储备项目明细</b></aside>
-        <main><h3>储备项目运营复盘助手</h3><p>规则发现问题，业务人员确认结论</p><section><div><small>智能识别完成</small><strong>数据已准备好 · 150 条项目</strong></div><button type="button" onClick={onStart}>进入真实工具</button></section><nav><span>分析总览</span><span>项目问题清单</span><span>复盘摘要</span></nav><div className="product-dashboard-panels"><article><h4>部门储备金额分布</h4><i style={{ '--bar': '88%' } as CSSProperties}><span>华东部</span><b>2.71亿</b></i><i style={{ '--bar': '64%' } as CSSProperties}><span>华南部</span><b>1.93亿</b></i><i style={{ '--bar': '47%' } as CSSProperties}><span>华北部</span><b>1.42亿</b></i></article><article><h4>销售经理储备金额分布</h4><i style={{ '--bar': '81%' } as CSSProperties}><span>销售甲</span><b>2.18亿</b></i><i style={{ '--bar': '68%' } as CSSProperties}><span>销售乙</span><b>1.83亿</b></i><i style={{ '--bar': '45%' } as CSSProperties}><span>销售丙</span><b>1.21亿</b></i></article><article><h4>本轮重点标签</h4><p>跟进维护超期<small>12 个项目</small></p><p>大额重点项目<small>9 个项目</small></p><p>签约日期待更新<small>8 个项目</small></p></article></div></main>
+        <main><h3>储备项目运营复盘助手</h3><p>规则发现问题，业务人员确认结论</p><section><div><small>智能识别完成</small><strong>数据已准备好 · 150 条演示项目</strong></div><button type="button" onClick={onStart}>进入真实工具</button></section><nav><span>数据总览</span><span>问题项目</span><span>人工复核</span><span>复盘报告</span></nav><div className="product-dashboard-panels"><article><h4>部门储备金额分布</h4><i style={{ '--bar': '88%' } as CSSProperties}><span>华东部</span><b>2.71亿</b></i><i style={{ '--bar': '64%' } as CSSProperties}><span>华南部</span><b>1.93亿</b></i><i style={{ '--bar': '47%' } as CSSProperties}><span>华北部</span><b>1.42亿</b></i></article><article><h4>销售经理储备金额分布</h4><i style={{ '--bar': '81%' } as CSSProperties}><span>销售甲</span><b>2.18亿</b></i><i style={{ '--bar': '68%' } as CSSProperties}><span>销售乙</span><b>1.83亿</b></i><i style={{ '--bar': '45%' } as CSSProperties}><span>销售丙</span><b>1.21亿</b></i></article><article><h4>分析标签命中（可重复）</h4><p>跟进维护超期<small>12 个演示项目</small></p><p>大额重点项目<small>9 个演示项目</small></p><p>签约日期待更新<small>8 个演示项目</small></p></article></div></main>
       </div>
     </section>
 
