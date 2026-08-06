@@ -124,7 +124,9 @@ describe('AnalysisWorkspace', () => {
     }
     expect(screen.getByRole('heading', { name: '部门储备金额分布' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: '销售经理储备金额分布' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: '分析标签分布' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '分析标签命中（可重复）' })).toBeInTheDocument();
+    expect(screen.getByText('2 个项目命中标签，共 3 次标签命中；同一项目可同时命中多个标签。')).toBeInTheDocument();
+    expect(screen.getAllByText('1 个项目')).toHaveLength(3);
   });
 
   it('renders the management summary and forwards preview and detail-export commands', async () => {

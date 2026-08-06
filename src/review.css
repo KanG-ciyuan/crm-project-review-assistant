@@ -386,6 +386,13 @@
   padding: 18px;
 }
 
+.chart-card-heading p {
+  margin: 7px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
 .analysis-overview .bar-row {
   grid-template-columns: minmax(72px, 96px) minmax(48px, 1fr) minmax(64px, auto);
 }

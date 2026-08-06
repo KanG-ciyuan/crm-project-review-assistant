@@ -29,7 +29,7 @@ export function AnalysisOverview({ analysis, rows }: AnalysisOverviewProps) {
     <section className="summary-grid" aria-label="组织储备汇总">
       <AmountBreakdown title="部门储备金额分布" items={analysis.byDepartment} />
       <AmountBreakdown title="销售经理储备金额分布" items={analysis.bySalesManager} />
-      <LabelBreakdown items={labels} />
+      <LabelBreakdown items={labels} taggedProjectCount={rows.filter((row) => row.findings.length > 0).length} />
     </section>
   </div>;
 }
@@ -47,11 +47,18 @@ function AmountBreakdown({ title, items }: { title: string; items: BreakdownItem
     </div>)}</section>;
 }
 
-function LabelBreakdown({ items }: { items: BreakdownItem[] }) {
+function LabelBreakdown({ items, taggedProjectCount }: { items: BreakdownItem[]; taggedProjectCount: number }) {
   const max = Math.max(...items.map((item) => item.projectCount), 1);
-  return <section className="chart-card"><h2>分析标签分布</h2>{items.length === 0
-    ? <p className="no-issues">暂无分析标签。</p>
-    : items.slice(0, 8).map((item) => <div className="bar-row" key={item.name}>
-      <span>{item.name}</span><div className="track"><i style={{ width: `${(item.projectCount / max) * 100}%` }} /></div><b>{item.projectCount} 个</b>
-    </div>)}</section>;
+  const totalHits = items.reduce((sum, item) => sum + item.projectCount, 0);
+  return <section className="chart-card">
+    <div className="chart-card-heading">
+      <h2>分析标签命中（可重复）</h2>
+      {items.length > 0 && <p>{taggedProjectCount} 个项目命中标签，共 {totalHits} 次标签命中；同一项目可同时命中多个标签。</p>}
+    </div>
+    {items.length === 0
+      ? <p className="no-issues">暂无分析标签。</p>
+      : items.slice(0, 8).map((item) => <div className="bar-row" key={item.name}>
+        <span>{item.name}</span><div className="track"><i style={{ width: `${(item.projectCount / max) * 100}%` }} /></div><b>{item.projectCount} 个项目</b>
+      </div>)}
+  </section>;
 }
