@@ -9,7 +9,8 @@ const themeCss = readFileSync('src/tool-theme.css', 'utf8');
 const allCss = `${globalCss}\n${filterCss}\n${reviewCss}\n${themeCss}`;
 
 function cssHexVariable(name: string) {
-  return globalCss.match(new RegExp(`--${name}:\\s*(#[0-9a-f]{6})`, 'i'))?.[1] ?? '#000000';
+  const matches = [...allCss.matchAll(new RegExp(`--${name}:\\s*(#[0-9a-f]{6})`, 'gi'))];
+  return matches.at(-1)?.[1] ?? '#000000';
 }
 
 function relativeLuminance(hex: string) {
@@ -53,25 +54,23 @@ describe('analysis workbench layout styles', () => {
 
   });
 
-  it('computes the dark teal focus token used by keyboard outlines', () => {
+  it('computes the homepage blue focus token used by keyboard outlines', () => {
     mountRealStyles();
 
-    expect(getComputedStyle(document.documentElement).getPropertyValue('--focus').trim()).toBe('#0c6668');
+    expect(getComputedStyle(document.documentElement).getPropertyValue('--focus').trim()).toBe('#405ad7');
     expect(globalCss).toMatch(/button:focus-visible,[\s\S]*?outline:\s*3px solid var\(--focus\)/);
 
   });
 
-  it('uses contrast-safe focus tokens on light canvas and dark sidebar surfaces', () => {
+  it('uses a contrast-safe focus token on the light canvas and sidebar', () => {
     mountRealStyles();
     const focus = cssHexVariable('focus');
-    const focusOnDark = cssHexVariable('focus-on-dark');
 
     expect(contrastRatio(focus, '#ffffff')).toBeGreaterThanOrEqual(3);
-    expect(contrastRatio(focus, '#f3f5f5')).toBeGreaterThanOrEqual(3);
-    expect(contrastRatio(focusOnDark, '#0b5052')).toBeGreaterThanOrEqual(3);
-    expect(contrastRatio(focusOnDark, '#104f51')).toBeGreaterThanOrEqual(3);
-    expect(getComputedStyle(document.documentElement).getPropertyValue('--focus-on-dark').trim()).toBe('#63aaa8');
-    expect(globalCss).toMatch(/\.sidebar\s+(?:button|input|select|textarea|a):focus-visible,[\s\S]*?outline-color:\s*var\(--focus-on-dark\)/);
+    expect(contrastRatio(focus, '#f5f6f8')).toBeGreaterThanOrEqual(3);
+    expect(contrastRatio(focus, '#f6f7fa')).toBeGreaterThanOrEqual(3);
+    expect(getComputedStyle(document.documentElement).getPropertyValue('--focus-on-dark').trim()).toBe('#aeb9e8');
+    expect(themeCss).toMatch(/\.sidebar\s+button:focus-visible,[\s\S]*?outline-color:\s*var\(--focus\)/);
   });
 
   it('gives the workbench tabs a stable accessible selected state', () => {
@@ -156,10 +155,22 @@ describe('analysis workbench layout styles', () => {
   });
 
   it('keeps the management theme in the final loaded stylesheet layer', () => {
-    expect(themeCss).toMatch(/\.sidebar\s*\{[\s\S]*?background:\s*#eef3f3/);
+    expect(themeCss).toMatch(/\.sidebar\s*\{[\s\S]*?background:\s*#f6f7fa/);
     expect(themeCss).toMatch(/\.app-shell\s*\{[\s\S]*?grid-template-columns:\s*272px/);
     expect(themeCss).toMatch(/\.content\s+h1\s*\{[\s\S]*?font-size:\s*29px/);
     expect(themeCss).toMatch(/\.upload-button\s*\{[\s\S]*?min-height:\s*44px/);
     expect(themeCss).toMatch(/\.sidebar\s+button:focus-visible,[\s\S]*?outline-color:\s*var\(--focus\)/);
+  });
+
+  it('uses the homepage blue family in the final workbench theme layer', () => {
+    expect(themeCss).toMatch(/--accent:\s*#405ad7/);
+    expect(themeCss).toMatch(/--accent-strong:\s*#293c9b/);
+    expect(themeCss).toMatch(/--focus:\s*#405ad7/);
+    expect(themeCss).not.toMatch(/--accent:\s*#126466/);
+    expect(themeCss).toMatch(/\.sidebar\s*\{[\s\S]*?background:\s*#f6f7fa/);
+    expect(themeCss).toMatch(/\.brand-mark\s*\{[\s\S]*?background:\s*#405ad7/);
+    expect(themeCss).toMatch(/\.workbench-tabs\s+button\[aria-selected=['"]true['"]\]\s*\{[\s\S]*?background:\s*#eef1ff/);
+    expect(themeCss).toMatch(/\.review-summary-actions\s+button:first-child,[\s\S]*?background:\s*var\(--accent\)/);
+    expect(themeCss).toMatch(/\.report-preview-actions\s+button:last-child\s*\{[\s\S]*?background:\s*var\(--accent\)/);
   });
 });
