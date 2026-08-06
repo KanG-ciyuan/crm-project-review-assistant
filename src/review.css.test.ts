@@ -173,4 +173,10 @@ describe('analysis workbench layout styles', () => {
     expect(themeCss).toMatch(/\.review-summary-actions\s+button:first-child,[\s\S]*?background:\s*var\(--accent\)/);
     expect(themeCss).toMatch(/\.report-preview-actions\s+button:last-child\s*\{[\s\S]*?background:\s*var\(--accent\)/);
   });
+
+  it('renders the worksheet selector like the adjacent workbench fields', () => {
+    expect(themeCss).toMatch(/\.sidebar\s+select\s*\{[\s\S]*?appearance:\s*none/);
+    expect(themeCss).toMatch(/\.sidebar\s+select\s*\{[\s\S]*?background-image:/);
+    expect(themeCss).toMatch(/\.source-namespace\s+input,\s*\.sidebar\s+select,\s*\.threshold\s+input\s*\{[\s\S]*?min-height:\s*42px/);
+  });
 });
