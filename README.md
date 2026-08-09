@@ -138,6 +138,7 @@ CHANGELOG.md      已完成版本与验证结果
 ## 版本记录与文档
 
 - [迭代记录](./CHANGELOG.md)
+- [Git 版本规划](./docs/product/版本规划.md)
 - [产品 PRD](./docs/product/V1-PRD.md)
 - [产品流程与页面结构](./docs/product/产品流程与页面结构图.md)
 - [字段字典与规则确认稿](./docs/product/CRM历史项目表-字段字典与规则确认稿.md)
