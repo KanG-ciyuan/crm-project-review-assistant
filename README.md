@@ -142,3 +142,11 @@ CHANGELOG.md      已完成版本与验证结果
 - [产品 PRD](./docs/product/V1-PRD.md)
 - [产品流程与页面结构](./docs/product/产品流程与页面结构图.md)
 - [字段字典与规则确认稿](./docs/product/CRM历史项目表-字段字典与规则确认稿.md)
+
+## 参与共建
+
+欢迎通过 Issue 提交问题、规则建议或使用反馈，也欢迎通过 Pull Request 参与改进。提交示例数据前，请确认数据已经脱敏且具备公开授权。
+
+## 许可证
+
+本项目采用 [MIT License](./LICENSE) 开源。
