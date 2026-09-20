@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
-import { ArrowLeft, Copy, Download, FileSpreadsheet, GitFork, Mail, ShieldCheck, Upload } from 'lucide-react';
+import { ArrowLeft, Download, FileSpreadsheet, GitFork, MessageSquare, ShieldCheck, Upload } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import './review.css';
 import './filters.css';
@@ -59,7 +59,6 @@ export function ReviewTool({ onBack }: { onBack?: () => void }) {
   const [error, setError] = useState('');
   const [reviewRecords, setReviewRecords] = useState<ReviewRecordMap>(() => loadReviewRecords(window.localStorage));
   const [storageError, setStorageError] = useState('');
-  const [feedbackCopied, setFeedbackCopied] = useState(false);
   const [reportSnapshot, setReportSnapshot] = useState<ReportPreviewSnapshot | null>(null);
   const [reportPreviewOpen, setReportPreviewOpen] = useState(false);
   const [reportDownloaded, setReportDownloaded] = useState(false);
@@ -238,15 +237,6 @@ export function ReviewTool({ onBack }: { onBack?: () => void }) {
     );
   }
 
-  async function copyFeedbackEmail() {
-    try {
-      await navigator.clipboard.writeText('88416563@qq.com');
-      setFeedbackCopied(true);
-    } catch {
-      setFeedbackCopied(false);
-    }
-  }
-
   return <>
     <div className="app-shell" ref={appShellRef}>
     <aside className="sidebar">
@@ -287,9 +277,7 @@ export function ReviewTool({ onBack }: { onBack?: () => void }) {
       </>}
       <footer className="product-footer">
         <span>反馈建议</span>
-        <a href="mailto:88416563@qq.com"><Mail size={14} /> 邮件反馈</a>
-        <i aria-hidden="true" />
-        <button className="footer-action" type="button" onClick={copyFeedbackEmail}><Copy size={14} /> {feedbackCopied ? '已复制' : '复制邮箱'}</button>
+        <a href="https://github.com/KanG-ciyuan/crm-project-review-assistant/issues" target="_blank" rel="noreferrer"><MessageSquare size={14} /> 问题反馈</a>
         <i aria-hidden="true" />
         <a href="https://github.com/KanG-ciyuan/crm-project-review-assistant" target="_blank" rel="noreferrer"><GitFork size={14} /> 代码与版本</a>
       </footer>

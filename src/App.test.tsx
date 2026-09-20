@@ -55,23 +55,11 @@ it('retains a user-selected review status after a page-style storage reload', ()
   expect(loadReviewRecords(storage)['P-1']).toMatchObject({ status: '已忽略', note: '已处理。' });
 });
 
-it('shows email and GitHub feedback links on the import page', () => {
+it('shows issue and GitHub feedback links on the import page', () => {
   render(<ReviewTool />);
 
-  expect(screen.getByRole('link', { name: '邮件反馈' })).toHaveAttribute('href', 'mailto:88416563@qq.com');
+  expect(screen.getByRole('link', { name: '问题反馈' })).toHaveAttribute('href', 'https://github.com/KanG-ciyuan/crm-project-review-assistant/issues');
   expect(screen.getByRole('link', { name: '代码与版本' })).toHaveAttribute('href', 'https://github.com/KanG-ciyuan/crm-project-review-assistant');
-});
-
-it('copies the feedback email address from the footer', async () => {
-  const user = userEvent.setup();
-  const writeText = vi.fn().mockResolvedValue(undefined);
-  Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
-
-  render(<ReviewTool />);
-  await user.click(screen.getByRole('button', { name: '复制邮箱' }));
-
-  expect(writeText).toHaveBeenCalledWith('88416563@qq.com');
-  expect(await screen.findByRole('button', { name: '已复制' })).toBeInTheDocument();
 });
 
 it('opens smart confirmation for an arbitrary worksheet instead of requiring fixed headers', async () => {

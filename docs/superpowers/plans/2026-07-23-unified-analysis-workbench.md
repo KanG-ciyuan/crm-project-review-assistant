@@ -752,7 +752,7 @@ Expected: Vite prints a local URL and remains running.
 
 - [ ] **Step 2: Validate the 150-row sample on desktop**
 
-Upload `/Users/kang/Documents/Codex/2026-07-20/ai-crm-ai-ai-1-2/outputs/crm-large-sample-20260723-150/CRM项目运营复盘助手-150条脱敏模拟数据.xlsx` and verify:
+Upload the local 150-row desensitized sample `CRM项目运营复盘助手-150条脱敏模拟数据.xlsx` (kept outside the repository, path varies per machine) and verify:
 
 - one project row contains all its labels;
 - dates and overdue-day evidence are readable without Excel;
