@@ -47,7 +47,7 @@
 
 ## V0.4 - 2026-07-18
 
-- 将应用发布为 Cloudflare Workers 静态站点：<https://crm.88416563.workers.dev>
+- 将应用发布为 Cloudflare Workers 静态站点：legacy Cloudflare Workers deployment (retired)。
 - 上传页增加 CRM 历史项目表的 11 个固定字段说明、填写约定和可下载脱敏 `.xlsx` 示例表。
 - 完成示例表下载交互验收；自动化测试 32/32 通过。
 - 对应代码提交：`f9fc679`。
